@@ -1,0 +1,85 @@
+// Messages several features share.
+//
+// Conventions, applied to every message:
+// - Ids are UUID strings: they also appear in URLs.
+// - Timestamps are `google.protobuf.Timestamp`.
+// - Binary values (WebAuthn challenges, credential ids and responses) are `bytes`.
+// - `optional` marks a field whose absence means something ("no phone number"), so it is
+//   not confused with the empty value.
+// - Every enum starts with an `_UNSPECIFIED = 0` value, which the server rejects in
+//   requests and never sends.
+// - A field that holds a password, code or token carries `[(api.v1.secret) = true]`.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Something a user may be allowed to do. Mirrors `domain::rbac::Permission`; the server
+// fails to compile until a new permission is added here too.
+enum Permission {
+  PERMISSION_UNSPECIFIED = 0;
+  PERMISSION_NOTES_READ = 1;
+  PERMISSION_NOTES_WRITE = 2;
+  PERMISSION_NOTES_MANAGE = 3;
+  PERMISSION_USERS_READ = 4;
+  PERMISSION_USERS_MANAGE = 5;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string username = 3;
+  optional string phone = 4;
+  bool phone_verified = 5;
+  bool email_verified = 6;
+  // Whether the account has a password (accounts made through a social provider may not).
+  bool has_password = 7;
+  bool disabled = 8;
+  repeated string roles = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message Me {
+  User user = 1;
+  // What the user may do. For showing and hiding UI only; the server checks again.
+  repeated Permission permissions = 2;
+}
+
+message Role {
+  string name = 1;
+  string description = 2;
+  repeated Permission permissions = 3;
+}
+
+message RoleList {
+  repeated Role roles = 1;
+}
+
+message Session {
+  string id = 1;
+  bool current = 2;
+  optional string ip = 3;
+  optional string user_agent = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp last_seen_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+}
+
+message SessionList {
+  repeated Session sessions = 1;
+}
+
+enum MfaMethod {
+  MFA_METHOD_UNSPECIFIED = 0;
+  MFA_METHOD_TOTP = 1;
+  MFA_METHOD_PASSKEY = 2;
+  MFA_METHOD_RECOVERY_CODE = 3;
+}
+
+// The first sign-in step succeeded and a second one is needed (status `202`). The server
+// set a short-lived cookie that identifies the attempt.
+message MfaChallenge {
+  repeated MfaMethod methods = 1;
+}

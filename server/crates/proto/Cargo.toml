@@ -1,0 +1,21 @@
+[package]
+name = "proto"
+description = "The API's Protocol Buffers messages, generated from /proto at build time."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+prost.workspace = true
+prost-types.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+prost-reflect.workspace = true
+protox.workspace = true
+
+# Not the workspace lints: most of this crate is prost-build's output, which is not
+# written to pass clippy's pedantic set. `build.rs` is small enough to review by hand.
+[lints.rust]
+unsafe_code = "forbid"

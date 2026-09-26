@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light dark" />
+		<title>%sveltekit.status%</title>
+		<!-- The last resort when even the app shell cannot render: no scripts, no assets, and
+		     only `style` attributes, which the server's CSP allows (a <style> element it does not). -->
+	</head>
+	<body
+		style="
+			margin: 0;
+			min-height: 100svh;
+			display: grid;
+			place-items: center;
+			font-family: system-ui, sans-serif;
+			background: light-dark(#fff, #0a0a0a);
+			color: light-dark(#0a0a0a, #fafafa);
+		"
+	>
+		<main style="max-width: 36rem; padding: 1rem">
+			<p style="color: light-dark(#666, #a3a3a3); font-size: 0.875rem">%sveltekit.status%</p>
+			<h1 style="font-size: 1.5rem; font-weight: 600; margin: 0.5rem 0 1rem">
+				%sveltekit.error.message%
+			</h1>
+			<a href="/" style="color: inherit">Back to the start</a>
+		</main>
+	</body>
+</html>

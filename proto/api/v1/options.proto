@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package api.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  // A password, code or token. The Rust types redact the field from `Debug`, so it never
+  // reaches a log line. Not allowed inside a `oneof`.
+  bool secret = 50000;
+}

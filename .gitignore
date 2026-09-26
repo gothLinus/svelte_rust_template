@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+
+# Build and test output
+/server/target/
+/web/build/
+/web/coverage/
+

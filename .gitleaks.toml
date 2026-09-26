@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build output, dependencies, local config"
+paths = [
+  '''(^|/)server/target/''',
+  '''(^|/)web/node_modules/''',
+  '''(^|/)web/\.svelte-kit/''',
+  '''(^|/)web/build/''',
+  '''(^|/)web/coverage/''',
+  '''(^|/)\.env$''',
+]
+# Development-only key from an earlier .env.example; refused unless APP_URL is localhost.
+regexes = ['''ZGV2ZWxvcG1lbnQtb25seS1rZXktY2hhbmdlLW1lISE=''']

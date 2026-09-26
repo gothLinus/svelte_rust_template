@@ -1,0 +1,74 @@
+# Local services; the `prod` profile adds the production image.
+
+# Fixed so every checkout shares one database container; set COMPOSE_PROJECT_NAME in
+# .env (and other ports) to give a checkout its own.
+name: ${COMPOSE_PROJECT_NAME:-svelte_rust_template}
+
+services:
+  postgres:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # Postgres 18+ images keep PGDATA in a versioned subdirectory of this path.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  # Catches outgoing mail; the inbox is at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.31@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    profiles: [mail, prod]
+    environment:
+      # Reverse lookups of the gateway address stall every SMTP greeting.
+      MP_SMTP_DISABLE_RDNS: "true"
+    ports:
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  # The production image over plain HTTP, hence COOKIE_SECURE=false; keep the default in
+  # a real deployment.
+  app:
+    profiles: [prod]
+    build: .
+    image: ${IMAGE_NAME:-svelte-rust-template}:latest
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-app}
+      APP_URL: http://localhost:${APP_PORT:-8080}
+      COOKIE_SECURE: "false"
+      MAIL_TRANSPORT: smtp
+      SMTP_URL: smtp://mailpit:1025
+      MAIL_FROM: ${MAIL_FROM:-Acme <noreply@example.com>}
+      # No default: the server refuses to start without a key.
+      SECRET_KEY: ${SECRET_KEY:-}
+      # Must stay below stop_grace_period.
+      SHUTDOWN_TIMEOUT: 20s
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    stop_grace_period: 30s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

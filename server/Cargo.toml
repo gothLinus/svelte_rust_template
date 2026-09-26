@@ -1,0 +1,88 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+
+[workspace.dependencies]
+domain = { path = "crates/domain" }
+application = { path = "crates/application" }
+infrastructure = { path = "crates/infrastructure" }
+i18n = { path = "crates/i18n" }
+api = { path = "crates/api" }
+proto = { path = "crates/proto" }
+
+argon2 = "0.6.0"
+axum = "0.8.9"
+axum-extra = { version = "0.12.6", default-features = false }
+base64 = "0.23.1"
+dotenvy = "0.15.7"
+fluent-bundle = "0.16.0"
+fluent-langneg = "0.13.1"
+fluent-syntax = "0.12.0"
+getrandom = "0.4.3"
+http-body-util = "0.1.5"
+lettre = { version = "0.11.23", default-features = false }
+mimalloc = { version = "0.1.52", default-features = false }
+prost = "0.14.4"
+prost-build = "0.14.4"
+prost-reflect = "0.16.5"
+prost-types = "0.14.4"
+protox = "0.9.1"
+reqwest = { version = "0.13.5", default-features = false }
+ring = "0.17.14"
+rustls = { version = "0.23.45", default-features = false }
+serde = "1.0.229"
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+sqlx = { version = "0.9.0", default-features = false }
+thiserror = "2.0.21"
+time = "0.3.55"
+tokio = "1.53.1"
+tower = "0.5.3"
+tower-http = "0.7.1"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false }
+unic-langid = "0.9.6"
+url = "2"
+uuid = "1.26.1"
+webpki-roots = "1.0.9"
+zeroize = "1.9.0"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+# Unwinding stays on (no `panic = "abort"`): `CatchPanicLayer` turns a panicking handler
+# into a 500 for that one request instead of taking every in-flight request down with
+# the process, and a panic in a background task ends that task, not the server.
+strip = true
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+unreachable = "warn"
+# Exceptions are `#[expect(lint, reason = "…")]`: they carry their justification, and the
+# compiler flags them once they are no longer needed.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
