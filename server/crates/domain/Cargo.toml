@@ -1,0 +1,19 @@
+[package]
+name = "domain"
+description = "Entities, value objects and the ports the outer layers implement. No I/O, no frameworks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+time = { workspace = true, features = ["std"] }
+uuid = { workspace = true, features = ["std", "v7"] }
+zeroize = { workspace = true, features = ["alloc"] }
+
+[dev-dependencies]
+time = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true
