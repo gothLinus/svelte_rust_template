@@ -1,0 +1,48 @@
+[package]
+name = "api"
+description = "HTTP interface and composition root: axum routes, extractors, middleware and the server binary."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
+[dependencies]
+application.workspace = true
+axum = { workspace = true, features = ["macros"] }
+axum-extra = { workspace = true, features = ["cookie"] }
+domain.workspace = true
+i18n.workspace = true
+infrastructure.workspace = true
+mimalloc.workspace = true
+proto.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "io-util"] }
+tower = { workspace = true, features = ["timeout", "util"] }
+tower-http = { workspace = true, features = ["catch-panic", "compression-br", "compression-gzip", "cors", "fs", "request-id", "set-header", "trace"] }
+# `trace!` compiles to nothing in release builds (ours and every dependency's); `debug!`
+# stays, so RUST_LOG can still turn it on in production.
+tracing = { workspace = true, features = ["release_max_level_debug"] }
+url.workspace = true
+tracing-subscriber = { workspace = true, features = ["ansi", "env-filter", "fmt", "json", "std"] }
+# `serde`: ids in paths deserialize straight into `Uuid`.
+uuid = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+http-body-util.workspace = true
+infrastructure = { workspace = true, features = ["test-support"] }
+ring.workspace = true
+base64.workspace = true
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio", "macros", "migrate"] }
+time.workspace = true
+tokio = { workspace = true, features = ["macros", "rt"] }
+uuid = { workspace = true, features = ["v7"] }
+
+[lints]
+workspace = true
