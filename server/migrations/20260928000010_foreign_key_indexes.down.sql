@@ -1,0 +1,3 @@
+drop index oauth_flows_link_user_id_idx;
+drop index webauthn_challenges_user_id_idx;
+drop index mfa_challenges_user_id_idx;
