@@ -1,0 +1,14 @@
+// `/api/v1/admin`: account administration. The list's filters are query parameters:
+// `?search=ali&limit=20&after=<cursor>`.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "api/v1/common.proto";
+
+message UserPage {
+  repeated User items = 1;
+  // Pass as `after` to get the next page. Absent on the last page. Opaque.
+  optional string next_cursor = 2;
+}

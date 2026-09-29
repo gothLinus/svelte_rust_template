@@ -1,0 +1,39 @@
+// `/api/v1/me`: the signed-in user's own account.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "api/v1/oauth.proto";
+import "api/v1/options.proto";
+import "api/v1/passkeys.proto";
+import "api/v1/passwordless.proto";
+
+message UpdateProfileRequest {
+  string username = 1;
+}
+
+message ChangeEmailRequest {
+  string email = 1;
+}
+
+message AddPhoneRequest {
+  string phone = 1;
+  TextChannel channel = 2;
+}
+
+message DeleteAccountRequest {
+  // The account's password, if it has one: confirms the deletion when the session did not
+  // sign in or re-authenticate recently.
+  optional string password = 1 [(api.v1.secret) = true];
+}
+
+message SecurityOverview {
+  bool has_password = 1;
+  // Signing in with anything but a passkey asks for a second step.
+  bool mfa_enabled = 2;
+  bool totp_enabled = 3;
+  uint32 recovery_codes_remaining = 4;
+  repeated Passkey passkeys = 5;
+  repeated LinkedAccount linked_accounts = 6;
+}
