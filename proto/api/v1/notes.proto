@@ -1,0 +1,35 @@
+// `/api/v1/notes`: the example resource. Copy this file when adding one. The list's
+// filters are query parameters: `?scope=mine|all&limit=20&after=<cursor>`.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message Note {
+  string id = 1;
+  string owner_id = 2;
+  string title = 3;
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message CreateNoteRequest {
+  string title = 1;
+  // Empty when absent.
+  optional string body = 2;
+}
+
+// A partial update: absent fields keep their value.
+message UpdateNoteRequest {
+  optional string title = 1;
+  optional string body = 2;
+}
+
+message NotePage {
+  repeated Note items = 1;
+  // Pass as `after` to get the next page. Absent on the last page. Opaque.
+  optional string next_cursor = 2;
+}
