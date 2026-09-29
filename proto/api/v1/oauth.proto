@@ -1,0 +1,25 @@
+// Social sign-in (`/api/v1/auth/oauth`) and linked accounts (`/api/v1/me/linked-accounts`).
+// The sign-in flow itself is browser redirects, not messages.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message OAuthProvider {
+  string id = 1;
+  string name = 2;
+}
+
+message LinkedAccount {
+  string provider = 1;
+  string provider_name = 2;
+  optional string email = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp last_used_at = 5;
+}
+
+message LinkedAccountList {
+  repeated LinkedAccount accounts = 1;
+}

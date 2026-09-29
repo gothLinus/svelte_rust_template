@@ -1,0 +1,113 @@
+// Passkeys: signing in with one (`/api/v1/auth/passkeys`), as a second step
+// (`/api/v1/auth/mfa/passkeys`), to re-authenticate (`/api/v1/me/reauthenticate/passkey`),
+// and managing them (`/api/v1/me/passkeys`).
+//
+// The options carry what `navigator.credentials.create()` and `.get()` take, with binary
+// values as `bytes`, so the browser passes them on without decoding anything. Every
+// credential is of type `public-key`, so the type is left out.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "api/v1/mfa.proto";
+import "google/protobuf/timestamp.proto";
+
+message RelyingParty {
+  string id = 1;
+  string name = 2;
+}
+
+message PasskeyUser {
+  // The user id's 16 bytes. Authenticators hand them back when signing in.
+  bytes id = 1;
+  string name = 2;
+  string display_name = 3;
+}
+
+message CredentialDescriptor {
+  bytes id = 1;
+  repeated string transports = 2;
+}
+
+message AuthenticatorSelection {
+  string resident_key = 1;
+  string user_verification = 2;
+}
+
+message PublicKeyCreationOptions {
+  RelyingParty rp = 1;
+  PasskeyUser user = 2;
+  bytes challenge = 3;
+  repeated sint32 algorithms = 4;
+  // Milliseconds.
+  uint32 timeout = 5;
+  repeated CredentialDescriptor exclude_credentials = 6;
+  AuthenticatorSelection authenticator_selection = 7;
+  // Always `none`.
+  string attestation = 8;
+}
+
+message PublicKeyRequestOptions {
+  bytes challenge = 1;
+  string rp_id = 2;
+  // Milliseconds.
+  uint32 timeout = 3;
+  string user_verification = 4;
+  // Empty when signing in: the user picks any passkey for this site.
+  repeated CredentialDescriptor allow_credentials = 5;
+}
+
+message PasskeyCreationOptions {
+  string challenge_id = 1;
+  PublicKeyCreationOptions public_key = 2;
+}
+
+message PasskeyRequestOptions {
+  string challenge_id = 1;
+  PublicKeyRequestOptions public_key = 2;
+}
+
+message RegisterPasskeyRequest {
+  string challenge_id = 1;
+  string name = 2;
+  bytes credential_id = 3;
+  bytes client_data_json = 4;
+  bytes authenticator_data = 5;
+  // `response.getPublicKey()`: DER `SubjectPublicKeyInfo`.
+  bytes public_key = 6;
+  sint32 public_key_algorithm = 7;
+  repeated string transports = 8;
+}
+
+message PasskeyAssertionRequest {
+  string challenge_id = 1;
+  bytes credential_id = 2;
+  bytes client_data_json = 3;
+  bytes authenticator_data = 4;
+  bytes signature = 5;
+  optional bytes user_handle = 6;
+}
+
+message RenamePasskeyRequest {
+  string name = 1;
+}
+
+message Passkey {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  // Absent until the passkey is first used.
+  google.protobuf.Timestamp last_used_at = 4;
+}
+
+message PasskeyList {
+  repeated Passkey passkeys = 1;
+}
+
+// A registered passkey (status `201`). `recovery_codes` is set when it turned two-step
+// sign-in on.
+message PasskeyRegistered {
+  Passkey passkey = 1;
+  RecoveryCodes recovery_codes = 2;
+}

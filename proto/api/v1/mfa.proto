@@ -1,0 +1,28 @@
+// The second sign-in step (`/api/v1/auth/mfa`) and managing it (`/api/v1/me/mfa`).
+
+syntax = "proto3";
+
+package api.v1;
+
+import "api/v1/options.proto";
+
+message CodeRequest {
+  string code = 1 [(api.v1.secret) = true];
+}
+
+message TotpSetup {
+  string secret = 1 [(api.v1.secret) = true];
+  // An `otpauth://` URI, for a QR code. It contains the secret.
+  string uri = 2 [(api.v1.secret) = true];
+}
+
+// New recovery codes. Shown once; only digests are stored.
+message RecoveryCodes {
+  repeated string codes = 1 [(api.v1.secret) = true];
+}
+
+// The result of turning on a second step. `recovery_codes` is set when two-step sign-in
+// was off before, so the user gets codes for the first time.
+message SecondFactorAdded {
+  RecoveryCodes recovery_codes = 1;
+}

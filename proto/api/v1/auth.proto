@@ -1,0 +1,84 @@
+// `/api/v1/auth`: registration, sign-in and sign-out, email verification, password reset,
+// and step-up re-authentication (`/api/v1/me/reauthenticate`).
+//
+// Sign-in endpoints answer `200` with a `Me` and a session cookie, or `202` with an
+// `MfaChallenge` when a second step is needed.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "api/v1/oauth.proto";
+import "api/v1/options.proto";
+import "api/v1/passwordless.proto";
+
+message RegisterRequest {
+  string email = 1;
+  string username = 2;
+  string password = 3 [(api.v1.secret) = true];
+}
+
+// Returned (status `202`) instead of a session when sign-in requires a verified address.
+message VerificationPending {
+  string email = 1;
+}
+
+message LoginRequest {
+  string identifier = 1;
+  string password = 2 [(api.v1.secret) = true];
+}
+
+message VerifyEmailRequest {
+  string token = 1 [(api.v1.secret) = true];
+}
+
+message ForgotPasswordRequest {
+  string email = 1;
+}
+
+message ResetPasswordRequest {
+  string token = 1 [(api.v1.secret) = true];
+  string password = 2 [(api.v1.secret) = true];
+}
+
+message ConfirmEmailRequest {
+  string token = 1 [(api.v1.secret) = true];
+}
+
+message CancelEmailChangeRequest {
+  string token = 1 [(api.v1.secret) = true];
+}
+
+message AuthMethods {
+  string app_name = 1;
+  repeated OAuthProvider providers = 2;
+  repeated TextChannel text_channels = 3;
+  LinkLifetimes lifetimes = 4;
+}
+
+message LinkLifetimes {
+  uint32 sign_in_minutes = 1;
+  uint32 text_code_minutes = 2;
+  uint32 password_reset_minutes = 3;
+  uint32 email_verification_hours = 4;
+  uint32 email_change_hours = 5;
+}
+
+enum ReauthMethod {
+  REAUTH_METHOD_UNSPECIFIED = 0;
+  REAUTH_METHOD_PASSWORD = 1;
+  REAUTH_METHOD_TOTP = 2;
+  REAUTH_METHOD_PASSKEY = 3;
+  REAUTH_METHOD_EMAIL_CODE = 4;
+}
+
+message ReauthMethods {
+  repeated ReauthMethod methods = 1;
+}
+
+// Re-authenticates the session with a password, an authenticator code or an emailed code.
+// Passkeys have their own ceremony endpoints, so `REAUTH_METHOD_PASSKEY` is refused here.
+message ReauthenticateRequest {
+  ReauthMethod method = 1;
+  string secret = 2 [(api.v1.secret) = true];
+}
