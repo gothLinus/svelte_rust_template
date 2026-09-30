@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from user_tokens\n                where token_hash in (\n                    select token_hash from user_tokens where expires_at <= $1 limit $2\n                )\n                and expires_at <= $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d94ac0af52dd2086fa03adbbb836f8aab3529266c3ebd6ceb30c9698bd672fb6"
+}

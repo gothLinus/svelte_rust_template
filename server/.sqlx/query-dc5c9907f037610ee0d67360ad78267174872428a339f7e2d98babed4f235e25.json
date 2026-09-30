@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update totp_credentials set confirmed_at = $2, last_used_step = $3\n            where user_id = $1 and confirmed_at is null\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dc5c9907f037610ee0d67360ad78267174872428a339f7e2d98babed4f235e25"
+}

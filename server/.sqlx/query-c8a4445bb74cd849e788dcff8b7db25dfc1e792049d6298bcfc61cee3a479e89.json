@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from mfa_challenges where token_hash = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c8a4445bb74cd849e788dcff8b7db25dfc1e792049d6298bcfc61cee3a479e89"
+}

@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update outbox\n            set available_at = now() + make_interval(secs => $1)\n            where id in (\n                select id from outbox\n                where available_at <= now() and expires_at > now()\n                order by available_at\n                limit $2\n                for update skip locked\n            )\n            returning id, kind, payload, attempts\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "outbox",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "outbox",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "payload",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "outbox",
+            "name": "payload"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "outbox",
+            "name": "attempts"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cbf6853dc790fbef2a7dbdcf5f4fae9a2ead9f8fb3c29c05d7ed7ff116c39635"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select count(distinct u.id) as \"count!\"\n            from users u\n            join user_roles ur on ur.user_id = u.id\n            join role_permissions rp on rp.role = ur.role\n            where rp.permission = $1 and u.disabled_at is null\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0d84179010e6d8a11ced10f7d7dc22fb211e4d93a740815e0140983395b3471b"
+}

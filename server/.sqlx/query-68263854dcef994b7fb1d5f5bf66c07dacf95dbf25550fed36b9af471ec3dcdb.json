@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from external_identities where user_id = $1 and provider = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "68263854dcef994b7fb1d5f5bf66c07dacf95dbf25550fed36b9af471ec3dcdb"
+}

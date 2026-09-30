@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from users\n                where id in (\n                    select u.id from users u\n                    where u.email_verified_at is null and u.created_at < $1\n                      and not exists (\n                          select 1 from user_roles r where r.user_id = u.id and r.role <> 'user'\n                      )\n                    limit $2\n                )\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc5dca5b4588053323a00cb7e68f0f07a3e0fcc725a71579bfc36d70854e57e3"
+}

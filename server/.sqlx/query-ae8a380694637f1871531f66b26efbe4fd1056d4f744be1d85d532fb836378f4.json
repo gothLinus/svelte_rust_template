@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update sessions set rotation_pending = true where user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ae8a380694637f1871531f66b26efbe4fd1056d4f744be1d85d532fb836378f4"
+}

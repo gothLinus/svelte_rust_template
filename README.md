@@ -1,0 +1,177 @@
+# svelte_rust_template
+
+A full-stack starter with accounts, sign-in and roles built in.
+
+- **Server:** Rust 2024, Axum, SQLx and PostgreSQL, in layered crates.
+- **Web:** a SvelteKit 5 single-page app (Tailwind v4, shadcn-svelte) served by the API.
+
+```
+server/    Cargo workspace: domain, application, infrastructure, i18n, api, proto
+web/       SvelteKit SPA, adapter-static
+proto/     Protocol Buffers messages, the wire contract
+locales/   Fluent translations for the server and the web app
+```
+
+## Features
+
+- Registration and sign-in with email, username or phone number plus a password.
+- Passwordless sign-in: passkeys, magic links, email codes, SMS and WhatsApp codes (Twilio).
+- Social sign-in through OAuth 2.0 / OpenID Connect: Google, Apple, GitHub, Microsoft.
+- Two-step verification: authenticator apps, security keys, recovery codes.
+- Email verification, password reset, session list with revocation.
+- Account deletion and a JSON export of the user's data.
+- Roles and permissions with ownership rules.
+- Problem Details errors (RFC 9457) with field-level validation, keyset pagination.
+- Translations in Fluent files, English included.
+- `just new-resource` scaffolds a new resource in every layer, copied from the `notes` example.
+
+## Quick start
+
+Requires Rust, [bun](https://bun.sh), Docker and [just](https://github.com/casey/just).
+`just doctor` shows what is missing and `just tools` installs the cargo helpers.
+
+```sh
+just setup    # create .env, start Postgres and Mailpit, migrate, install web dependencies
+just dev      # API on :3000, web app on http://localhost:5173
+```
+
+Mail lands in Mailpit at http://localhost:8025 (`just mail`). To make an account an admin:
+
+```sh
+just create-admin you@example.com
+```
+
+Configuration is read from `.env`; `.env.example` lists every variable. The server
+validates them at startup and reports all problems at once. Development shortcuts such as
+plain HTTP and mail written to the log are accepted only while `APP_URL` is localhost.
+
+## Architecture
+
+```
+api ──────────► application ──────────► domain ◄────────── infrastructure
+(axum, wire)    (services, policies)    (entities, ports)  (sqlx, argon2, smtp)
+                                           ▲
+                                         i18n (Fluent catalog)
+```
+
+Dependencies point inward and are enforced by `Cargo.toml`:
+
+- `domain` holds entities, value objects and ports (traits). It has no I/O and no framework.
+- `application` holds the services and policies. It depends only on `domain`.
+- `infrastructure` implements the ports: Postgres repositories, hashing, mail, config.
+- `i18n` implements the translator port from the catalog in `locales/`.
+- `api` is the composition root: routes, middleware, wire conversion, startup.
+
+Services are generic over a single `Adapters` type family, so dispatch is static, and
+database work goes through a unit-of-work port. Start reading at `domain::repository`,
+`application::crud` and `api::wire`; `cargo doc --no-deps --open` in `server/` builds the
+reference.
+
+The web app is a static SPA: `load` functions and guards run in the browser and are
+conveniences only, because the API enforces access. In production the API serves the build
+from the same origin; in development Vite proxies `/api`.
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `just setup` / `just dev` | First run / API and Vite dev server together |
+| `just db-up` / `db-down` / `db-reset` | Start, stop or reset the local services |
+| `just migrate` / `migration <name>` | Apply migrations / create a reversible pair |
+| `just sqlx-prepare` | Refresh `server/.sqlx` after changing a query |
+| `just gen-types` / `check-types` | Regenerate / verify the TypeScript from `proto/` |
+| `just new-resource <thing> <things>` | Scaffold a resource from `notes` |
+| `just fmt` / `lint` / `check` | Format, lint, type-check |
+| `just test` / `coverage` | Run the tests / enforce coverage thresholds |
+| `just audit` | Dependency advisories, licenses, unused crates |
+| `just ci` | Everything CI runs; `ci-extra` adds secrets, MSRV and image smoke tests |
+| `just build` / `serve` | Release build / serve it on :3000 |
+| `just docker-build` / `up` | Build and run the production image |
+
+## Security
+
+- Sessions are opaque 32-byte tokens in `HttpOnly`, `Secure`, `SameSite=Lax` cookies. Only
+  their SHA-256 is stored. They expire when idle or after a fixed lifetime, rotate on
+  sign-in and after role changes, and can be revoked individually or all at once.
+- Passwords use Argon2id with bounded concurrency; excess sign-ins get a 503.
+- Adding or removing a sign-in method, changing the email address, deleting the account
+  and changing roles require a recent sign-in. The first proof of an email address
+  removes anything attached to the account before it, so pre-registering someone else's
+  address gains nothing.
+- Emailed and texted codes are single-use, short-lived, attempt-limited and stored as
+  digests. Passkeys and OAuth (PKCE, `state`, ID token checks) follow their specs. A social
+  account never takes over an existing account with the same address.
+- CSRF: state-changing requests need an `X-Requested-With` header and a matching `Origin`,
+  on top of `SameSite`.
+- Sign-in and password reset answer identically for known and unknown addresses, and so
+  does registration with `REQUIRE_EMAIL_VERIFICATION=true`.
+- Rate limits per IP and per account on the sensitive endpoints, configurable per
+  `RATE_LIMIT_*` variable. Use `RATE_LIMIT_STORE=postgres` with several instances.
+- A strict CSP, HSTS, `nosniff`, `X-Frame-Options` and related headers; `no-store` on API
+  responses.
+- Mail and texts are queued in an outbox table, encrypted with `SECRET_KEY`.
+
+## API
+
+- Everything is under `/api/v1`; `/health/live` and `/health/ready` sit outside it.
+- Bodies are Protocol Buffers (`application/x-protobuf`) defined in `proto/api/v1`. The
+  server compiles them at build time; `just gen-types` generates the TypeScript.
+- Errors are always `application/problem+json`. Switch on the stable `code`; `title`,
+  `detail` and field messages are translated per `Accept-Language`.
+
+  ```json
+  {
+    "type": "about:blank",
+    "title": "Unprocessable Entity",
+    "status": 422,
+    "code": "validation_failed",
+    "errors": [{ "field": "email", "code": "invalid_email", "message": "enter a valid email address" }]
+  }
+  ```
+
+- Lists use `?limit=20&after=<cursor>` and return `items` and `next_cursor`, newest first,
+  at most 100 per page.
+
+## Translations
+
+See [locales/README.md](locales/README.md). The server words everything it returns from
+`locales/<language>/server`, and the web app words its UI from `locales/<language>/web`.
+
+## Testing
+
+- `domain` and `application` have unit tests against in-memory fakes; time and token
+  generation are injected.
+- `infrastructure` and `api` have integration tests. Each `#[sqlx::test]` gets its own
+  migrated database, and the `api` tests drive the real router.
+- The web app uses Vitest for the client, guards, forms and route loads. There are no
+  browser end-to-end tests.
+
+## Deployment
+
+The `Dockerfile` builds the SPA, compiles the API with `SQLX_OFFLINE=true` and ships both
+in a distroless non-root image. `compose.yaml` runs Postgres and Mailpit locally, and its
+`prod` profile adds the image (`just up`).
+
+In production, set `APP_URL` (https), `DATABASE_URL`, `SECRET_KEY`, `MAIL_TRANSPORT=smtp`,
+`SMTP_URL` and `MAIL_FROM`; the server refuses to start with development settings. Add
+`TEXT_TRANSPORT=twilio` with the `TWILIO_*` variables and `TEXT_ALLOWED_COUNTRIES` for
+SMS, `OAUTH_*` variables per social provider, and `TRUST_PROXY=true` behind a proxy.
+Maintenance jobs run on one replica at a time.
+
+## Adding a resource
+
+```sh
+just new-resource project projects
+just migrate && just sqlx-prepare && just gen-types && just fmt
+just ci
+```
+
+This copies the `notes` slice into every layer (domain, application, repository, routes,
+proto, tests, API module, form, page, translations), adds a migration with the
+permissions, and registers it everywhere notes are registered. It takes single lowercase
+words and the plural spelled out.
+
+The copy keeps notes' `title` and `body`. Rename them in the migration, the domain types,
+the repository queries, `proto/api/v1/<things>.proto`, the wire conversion, the DTOs, the
+limits in `application/src/types.rs` and `web/src/lib/forms/validation.ts`, and the
+translations. Ownership rules are in the resource's `policy.rs` and `permissions.ts`.

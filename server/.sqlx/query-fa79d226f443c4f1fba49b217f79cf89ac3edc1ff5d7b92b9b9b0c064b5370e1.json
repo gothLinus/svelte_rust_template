@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from mfa_challenges\n                where token_hash in (\n                    select token_hash from mfa_challenges where expires_at <= $1 limit $2\n                )\n                and expires_at <= $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fa79d226f443c4f1fba49b217f79cf89ac3edc1ff5d7b92b9b9b0c064b5370e1"
+}

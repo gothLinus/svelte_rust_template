@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from one_time_codes\n                where (user_id, purpose) in (\n                    select user_id, purpose from one_time_codes where expires_at <= $1 limit $2\n                )\n                and expires_at <= $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0add13cfef7ea1deb6cbd8f55e18753811404259324ac356f2b0f01899e6aa46"
+}

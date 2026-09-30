@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        insert into rate_limits as r (bucket, key, tat)\n        values ($1, $2, now() + $3::interval)\n        on conflict (bucket, key) do update\n        set tat = greatest(r.tat, now()) + $3::interval\n        where greatest(r.tat, now()) + $3::interval <= now() + $4::interval\n        returning true as \"taken!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "taken!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Interval",
+        "Interval"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "af5cbc9935c507e8611282a3a53f6ead3992053baca2abc8ddc8959febd754b8"
+}

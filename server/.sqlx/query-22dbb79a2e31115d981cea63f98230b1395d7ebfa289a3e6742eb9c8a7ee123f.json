@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    update rate_limits\n                    set tat = greatest(tat - $3::interval, now())\n                    where bucket = $1 and key = $2\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Interval"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "22dbb79a2e31115d981cea63f98230b1395d7ebfa289a3e6742eb9c8a7ee123f"
+}

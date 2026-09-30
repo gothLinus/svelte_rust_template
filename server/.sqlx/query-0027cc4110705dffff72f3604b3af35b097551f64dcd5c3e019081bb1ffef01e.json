@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from outbox where expires_at <= now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "0027cc4110705dffff72f3604b3af35b097551f64dcd5c3e019081bb1ffef01e"
+}

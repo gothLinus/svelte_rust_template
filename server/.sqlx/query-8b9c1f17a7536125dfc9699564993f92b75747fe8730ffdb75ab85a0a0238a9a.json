@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                        delete from rate_limits\n                        where (bucket, key) in (\n                            select bucket, key from rate_limits where tat <= now() limit $1\n                        )\n                        and tat <= now()\n                        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8b9c1f17a7536125dfc9699564993f92b75747fe8730ffdb75ab85a0a0238a9a"
+}

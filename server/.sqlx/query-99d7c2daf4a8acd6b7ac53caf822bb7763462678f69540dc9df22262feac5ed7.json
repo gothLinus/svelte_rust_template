@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from sessions\n                where id in (\n                    select id from sessions\n                    where expires_at <= $1 or last_seen_at <= $2\n                    limit $3\n                )\n                and (expires_at <= $1 or last_seen_at <= $2)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "99d7c2daf4a8acd6b7ac53caf822bb7763462678f69540dc9df22262feac5ed7"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update external_identities set last_used_at = $2 where id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c395c32923d794a045d5ddd95a0ca57ad5b5e915625290c08868de013e64d018"
+}

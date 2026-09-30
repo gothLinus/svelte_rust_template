@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update sessions\n            set token_hash = $2, last_seen_at = $3, rotation_pending = false\n            where id = $1 and token_hash = $4\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Timestamptz",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "25436c4473fc86e7f499d10c5ad96229f181f372ddcd30a8c183cf2256dc5852"
+}

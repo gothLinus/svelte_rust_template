@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select user_id, sealed_secret, confirmed_at, last_used_step\n            from totp_credentials\n            where user_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "totp_credentials",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sealed_secret",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "totp_credentials",
+            "name": "sealed_secret"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "confirmed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "totp_credentials",
+            "name": "confirmed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_used_step",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "totp_credentials",
+            "name": "last_used_step"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "c7323827c1ba25d713f36b19023c79c86a3953122bb3c9dbd0d5200732daa2ef"
+}

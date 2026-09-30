@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update sessions set reauthenticated_at = $2 where id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "893e11a141047b8eceb5f1db234763cbf0685d2a69d469263cb7605234c3d661"
+}

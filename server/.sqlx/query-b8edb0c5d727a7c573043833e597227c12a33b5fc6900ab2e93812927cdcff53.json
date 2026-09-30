@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from webauthn_challenges\n                where id in (\n                    select id from webauthn_challenges where expires_at <= $1 limit $2\n                )\n                and expires_at <= $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b8edb0c5d727a7c573043833e597227c12a33b5fc6900ab2e93812927cdcff53"
+}

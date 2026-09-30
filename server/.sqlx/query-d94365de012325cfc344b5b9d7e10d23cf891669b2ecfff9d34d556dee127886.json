@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        select (extract(epoch from\n            greatest(tat, now()) + $3::interval - now() - $4::interval\n        ) * 1000000)::bigint as \"wait!\"\n        from rate_limits\n        where bucket = $1 and key = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "wait!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Interval",
+        "Interval"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d94365de012325cfc344b5b9d7e10d23cf891669b2ecfff9d34d556dee127886"
+}

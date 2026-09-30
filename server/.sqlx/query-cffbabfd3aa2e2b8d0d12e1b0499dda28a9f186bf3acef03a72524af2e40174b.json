@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from user_tokens where user_id = $1 and purpose = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cffbabfd3aa2e2b8d0d12e1b0499dda28a9f186bf3acef03a72524af2e40174b"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from mfa_challenges where user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "feeb309a8be931480e137abfe3e5acea01c66eb00147f44c35e6a4e0ffe69a4d"
+}

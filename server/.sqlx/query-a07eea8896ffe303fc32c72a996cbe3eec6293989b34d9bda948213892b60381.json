@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from oauth_flows\n                where state_hash in (\n                    select state_hash from oauth_flows where expires_at <= $1 limit $2\n                )\n                and expires_at <= $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a07eea8896ffe303fc32c72a996cbe3eec6293989b34d9bda948213892b60381"
+}

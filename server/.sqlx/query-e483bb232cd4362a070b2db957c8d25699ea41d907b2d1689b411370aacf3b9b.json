@@ -1,0 +1,143 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into passkeys\n                (id, user_id, credential_id, public_key, algorithm, sign_count, transports, name)\n            values ($1, $2, $3, $4, $5, $6, $7, $8)\n            returning id, user_id, credential_id, public_key, algorithm, sign_count, transports,\n                name, created_at, last_used_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "credential_id",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "credential_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "public_key",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "public_key"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "algorithm",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "algorithm"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "sign_count",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "sign_count"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "transports",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "transports"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "last_used_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "passkeys",
+            "name": "last_used_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bytea",
+        "Bytea",
+        "Int4",
+        "Int8",
+        "TextArray",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e483bb232cd4362a070b2db957c8d25699ea41d907b2d1689b411370aacf3b9b"
+}

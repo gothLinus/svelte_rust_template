@@ -1,0 +1,103 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update one_time_codes set attempts = attempts + 1\n            where user_id = $1 and purpose = $2 and attempts < $3 and expires_at > $4\n            returning user_id, purpose, channel, code_hash, target, attempts, expires_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "one_time_codes",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "purpose",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "one_time_codes",
+            "name": "purpose"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "channel",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "one_time_codes",
+            "name": "channel"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "code_hash",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "one_time_codes",
+            "name": "code_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "target",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "one_time_codes",
+            "name": "target"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "one_time_codes",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "one_time_codes",
+            "name": "expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "d00d1c1f738354c603c382a4d471bb5e06f2ae5e980414f16adb36ad32a33807"
+}

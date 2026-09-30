@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update sessions set last_seen_at = $2 where id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3bde3bc628ed5ca9c65577594fa96be2c333c84c08931d87f72aa91ceed6687b"
+}

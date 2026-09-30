@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into totp_credentials (user_id, sealed_secret, created_at)\n            values ($1, $2, $3)\n            on conflict (user_id) do update\n            set sealed_secret = excluded.sealed_secret,\n                last_used_step = null,\n                created_at = excluded.created_at\n            where totp_credentials.confirmed_at is null\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8e8836141bbed4446c4880c2bb303074e74e013fc19745677286cf0ebd262d8b"
+}

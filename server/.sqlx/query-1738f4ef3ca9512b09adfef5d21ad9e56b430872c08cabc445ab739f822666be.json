@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update outbox\n            set attempts = $2, last_error = $3, available_at = now() + make_interval(secs => $4)\n            where id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1738f4ef3ca9512b09adfef5d21ad9e56b430872c08cabc445ab739f822666be"
+}
