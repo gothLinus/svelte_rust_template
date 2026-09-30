@@ -11,6 +11,7 @@ mod audit;
 mod auth;
 mod crud;
 mod dto;
+mod files;
 mod locale;
 mod mail;
 mod notes;

@@ -12,6 +12,7 @@ pub use domain::error::ErrorChain;
 use domain::{
     error::{StorageError, ValidationError},
     i18n::Message,
+    object_store::ObjectStoreError,
     security::{CryptoError, HashError, TokenError},
 };
 use thiserror::Error;
@@ -101,6 +102,8 @@ pub enum InternalError {
     Token(#[from] TokenError),
     #[error(transparent)]
     Crypto(#[from] CryptoError),
+    #[error(transparent)]
+    Objects(ObjectStoreError),
 }
 
 /// Why a use case failed, in terms a client can act on. Only [`AppError::Internal`] is the
@@ -147,6 +150,8 @@ pub enum AppError {
     /// after a moment.
     #[error("the server is busy, try again in a moment")]
     Busy,
+    #[error("the upload did not arrive in full")]
+    IncompleteUpload,
     /// Unexpected; see [`InternalError`]. Clients only ever see a generic message.
     #[error("internal error")]
     Internal(#[from] InternalError),
@@ -188,6 +193,7 @@ impl AppError {
             Self::InvalidPasskey => "invalid_passkey",
             Self::ProviderUnavailable => "provider_unavailable",
             Self::Busy => "busy",
+            Self::IncompleteUpload => "incomplete_upload",
             Self::Internal(_) => "internal_error",
         }
     }
@@ -211,6 +217,7 @@ impl AppError {
             Self::InvalidPasskey => Message::new("error-invalid-passkey"),
             Self::ProviderUnavailable => Message::new("error-provider-unavailable"),
             Self::Busy => Message::new("error-busy"),
+            Self::IncompleteUpload => Message::new("error-incomplete-upload"),
             Self::Internal(_) => Message::new("error-internal"),
         }
     }
@@ -248,6 +255,16 @@ impl From<TokenError> for AppError {
 impl From<CryptoError> for AppError {
     fn from(err: CryptoError) -> Self {
         Self::Internal(err.into())
+    }
+}
+
+// A body that ended early is the client's doing; anything else is the store's, and internal.
+impl From<ObjectStoreError> for AppError {
+    fn from(err: ObjectStoreError) -> Self {
+        match err {
+            ObjectStoreError::Body(_) => Self::IncompleteUpload,
+            ObjectStoreError::Backend(_) => Self::Internal(InternalError::Objects(err)),
+        }
     }
 }
 

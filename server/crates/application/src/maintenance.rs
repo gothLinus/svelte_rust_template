@@ -6,16 +6,32 @@
 use std::sync::Arc;
 
 use domain::{
-    audit::AuditRepository, clock::Clock, database::Database, error::StorageError,
-    identity::IdentityRepository, mfa::MfaRepository, one_time_code::OneTimeCodeRepository,
-    passkey::PasskeyRepository, session::SessionRepository, user::UserRepository,
+    audit::AuditRepository,
+    clock::Clock,
+    database::Database,
+    error::{ErrorChain, StorageError},
+    identity::IdentityRepository,
+    mfa::MfaRepository,
+    object_store::ObjectDeletionRepository,
+    one_time_code::OneTimeCodeRepository,
+    passkey::PasskeyRepository,
+    session::SessionRepository,
+    user::UserRepository,
     user_token::UserTokenRepository,
 };
 use time::Duration;
 
-use crate::{Adapters, Context};
+use crate::{Adapters, Context, files::purge_object};
 
 pub const TOTP_SETUP_TTL: Duration = Duration::days(1);
+
+/// How many objects one round removes from the store at most. Each is a request to the store, so
+/// a larger backlog (a deleted account with many files) takes several rounds.
+pub const OBJECT_PURGE_LIMIT: u32 = 1_000;
+
+/// How long an object whose removal failed waits before the next attempt, so a store that is down
+/// is not asked again for every queued object each round.
+pub const OBJECT_PURGE_RETRY: Duration = Duration::hours(1);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Cleanup {
@@ -23,6 +39,9 @@ pub struct Cleanup {
     pub tokens: u64,
     pub accounts: u64,
     pub audit_events: u64,
+    /// Objects removed from the store: contents of deleted files and of uploads that never
+    /// finished.
+    pub objects: u64,
 }
 
 pub struct MaintenanceService<A: Adapters> {
@@ -54,16 +73,55 @@ impl<A: Adapters> MaintenanceService<A> {
             Some(retention) => conn.delete_audit_events_before(now - retention).await?,
             None => 0,
         };
+        let sessions = conn.delete_expired_sessions(now, idle_cutoff).await?;
+        let tokens = conn.delete_expired_user_tokens(now).await?
+            + conn.delete_expired_one_time_codes(now).await?
+            + conn.delete_expired_oauth_flows(now).await?
+            + conn.delete_expired_webauthn_challenges(now).await?
+            + conn.delete_expired_mfa_challenges(now).await?
+            + conn.delete_stale_totp_setups(now - TOTP_SETUP_TTL).await?;
+        drop(conn);
         Ok(Cleanup {
-            sessions: conn.delete_expired_sessions(now, idle_cutoff).await?,
-            tokens: conn.delete_expired_user_tokens(now).await?
-                + conn.delete_expired_one_time_codes(now).await?
-                + conn.delete_expired_oauth_flows(now).await?
-                + conn.delete_expired_webauthn_challenges(now).await?
-                + conn.delete_expired_mfa_challenges(now).await?
-                + conn.delete_stale_totp_setups(now - TOTP_SETUP_TTL).await?,
+            sessions,
+            tokens,
             accounts,
             audit_events,
+            objects: self.purge_objects().await?,
         })
+    }
+
+    /// Removes up to [`OBJECT_PURGE_LIMIT`] objects that are due from the store, and returns how
+    /// many. An object the store fails to remove is tried again after [`OBJECT_PURGE_RETRY`], and
+    /// the round stops there: the store is most likely down, and the rest can wait.
+    pub async fn purge_objects(&self) -> Result<u64, StorageError> {
+        let now = self.ctx.clock.now();
+        let due = self
+            .ctx
+            .db
+            .connection()
+            .await?
+            .due_object_deletions(now, OBJECT_PURGE_LIMIT)
+            .await?;
+
+        let mut purged = 0;
+        for key in due {
+            match purge_object(&self.ctx, &key).await {
+                Ok(()) => purged += 1,
+                Err(err) => {
+                    tracing::warn!(error = %ErrorChain(&err), %key, "removing an object failed");
+                    self.ctx
+                        .db
+                        .connection()
+                        .await?
+                        .schedule_object_deletion(&key, Some(now + OBJECT_PURGE_RETRY))
+                        .await?;
+                    break;
+                }
+            }
+        }
+        if purged > 0 {
+            tracing::debug!(purged, "removed objects from the store");
+        }
+        Ok(purged)
     }
 }

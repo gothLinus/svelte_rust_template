@@ -8,11 +8,13 @@ use domain::{
     clock::Clock,
     database::Database,
     error::ValidationError,
+    file::{FileRepository, StoredFile},
     i18n::{Locale, Message, Translator},
     identity::{IdentityProviders, IdentityRepository},
     mail::Mailer,
     mfa::MfaRepository,
     note::Note,
+    object_store::{ObjectDeletionRepository, ObjectStore},
     one_time_code::OneTimeCodeRepository,
     passkey::PasskeyRepository,
     rbac::RbacRepository,
@@ -48,6 +50,9 @@ pub trait Store:
     + MfaRepository
     + AuditRepository
     + Repository<Note>
+    + Repository<StoredFile>
+    + FileRepository
+    + ObjectDeletionRepository
 {
 }
 
@@ -62,6 +67,9 @@ impl<T> Store for T where
         + MfaRepository
         + AuditRepository
         + Repository<Note>
+        + Repository<StoredFile>
+        + FileRepository
+        + ObjectDeletionRepository
 {
 }
 
@@ -76,6 +84,7 @@ pub trait Adapters: Send + Sync + 'static {
     type Tokens: TokenGenerator;
     type Crypto: Crypto;
     type Clock: Clock;
+    type Objects: ObjectStore;
 }
 
 /// The configuration the use cases read, resolved once at startup by the composition root.
@@ -98,6 +107,7 @@ pub struct Settings {
     /// The language of mail and texts to users who chose none, and to addresses with no account
     /// behind them. API errors follow the request's `Accept-Language` instead.
     pub locale: Locale,
+    pub file_quota: Option<u64>,
 }
 
 impl Settings {
@@ -129,8 +139,7 @@ pub struct Context<A: Adapters> {
     pub tokens: A::Tokens,
     pub crypto: A::Crypto,
     pub clock: A::Clock,
-    /// The ports picked from configuration at runtime are dynamically dispatched; see
-    /// [`Mailer`].
+    pub objects: A::Objects,
     pub mailer: Arc<dyn Mailer>,
     pub texts: Arc<dyn TextSender>,
     pub identity_providers: Arc<dyn IdentityProviders>,

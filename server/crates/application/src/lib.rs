@@ -30,6 +30,7 @@ pub mod auth;
 pub mod crud;
 pub mod dto;
 pub mod export;
+pub mod files;
 pub mod health;
 pub mod mail;
 pub mod maintenance;

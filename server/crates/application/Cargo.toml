@@ -21,11 +21,13 @@ tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+bytes.workspace = true
+futures-util.workspace = true
 # The catalog the tests take their expected texts from. `i18n` itself depends only on
 # `domain`, so the application still knows nothing of it outside tests.
 i18n.workspace = true
 time = { workspace = true, features = ["macros"] }
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "sync"] }
 uuid = { workspace = true, features = ["v7"] }
 zeroize.workspace = true
 

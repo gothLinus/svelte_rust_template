@@ -1,0 +1,38 @@
+// `/api/v1/files`: files a user uploaded. Only what describes a file is a message: its
+// contents travel as raw bytes, the body of `POST /files?name=<name>` (with its
+// `Content-Type` and `Content-Length`) and of `GET /files/{id}/content`. The list's
+// filters are query parameters: `?scope=mine|all&limit=20&after=<cursor>`.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Named so it does not shadow the browser's `File` in the generated TypeScript.
+message StoredFile {
+  string id = 1;
+  string owner_id = 2;
+  string name = 3;
+  string content_type = 4;
+  uint64 size = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+// A partial update: absent fields keep their value. New contents are a new upload.
+message UpdateFileRequest {
+  optional string name = 1;
+}
+
+message StoredFilePage {
+  repeated StoredFile items = 1;
+  // Pass as `after` to get the next page. Absent on the last page. Opaque.
+  optional string next_cursor = 2;
+}
+
+message FileUsage {
+  uint64 used_bytes = 1;
+  // Absent when there is no quota.
+  optional uint64 quota_bytes = 2;
+}

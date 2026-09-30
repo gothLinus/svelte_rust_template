@@ -18,6 +18,7 @@ pub const EXPORTED_TABLES: &[&str] = &[
     "recovery_codes",
     "audit_events",
     "notes",
+    "files",
 ];
 
 pub const NOT_EXPORTED_TABLES: &[(&str, &str)] = &[

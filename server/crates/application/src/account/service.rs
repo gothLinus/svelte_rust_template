@@ -21,7 +21,7 @@ use domain::{
 };
 
 use crate::{
-    Adapters, Context,
+    Adapters, Context, Store,
     account::{
         dto::{
             AddPhoneRequest, ChangeEmailRequest, DeleteAccountRequest, ProfileChange, SecurityDto,
@@ -491,9 +491,7 @@ impl<A: Adapters> AccountService<A> {
 
         export.add("security_activity", audit_events(&mut conn, id).await?);
 
-        export
-            .add_owned::<domain::note::Note>(&mut conn, id)
-            .await?;
+        add_owned_resources(&mut export, &mut conn, id).await?;
 
         drop(conn);
         tracing::info!(user_id = %id, "personal data exported");
@@ -637,4 +635,16 @@ fn phone_taken() -> AppError {
         "phone",
         &ValidationError::new("phone_taken", Message::new("validation-phone-taken")),
     )
+}
+
+async fn add_owned_resources(
+    export: &mut crate::export::Export,
+    conn: &mut impl Store,
+    id: domain::user::UserId,
+) -> Result<(), AppError> {
+    export.add_owned::<domain::note::Note>(conn, id).await?;
+    export
+        .add_owned::<domain::file::StoredFile>(conn, id)
+        .await?;
+    Ok(())
 }

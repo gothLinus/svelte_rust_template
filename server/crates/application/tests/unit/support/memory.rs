@@ -12,9 +12,11 @@ use std::{
 use domain::{
     audit::{AuditEvent, AuditFilter, AuditRepository, NewAuditEvent},
     database::{Database, StorageError, Transaction},
+    file::{FileChanges, FileFilter, FileId, FileRepository, NewFile, StoredFile, StoredFileParts},
     identity::{ExternalIdentity, OAuthFlow},
     mfa::{MfaChallenge, TotpCredential},
     note::{NewNote, Note, NoteChanges, NoteFilter, NoteId, NoteParts},
+    object_store::{ObjectDeletionRepository, ObjectKey},
     one_time_code::OneTimeCode,
     pagination::{Cursor, Page, PageRequest},
     passkey::{Passkey, WebAuthnChallenge},
@@ -41,6 +43,8 @@ pub struct State {
     pub sessions: BTreeMap<SessionId, Session>,
     pub tokens: Vec<UserToken>,
     pub notes: BTreeMap<NoteId, Note>,
+    pub files: BTreeMap<FileId, StoredFile>,
+    pub object_deletions: BTreeMap<ObjectKey, Option<OffsetDateTime>>,
     pub codes: Vec<OneTimeCode>,
     pub identities: Vec<ExternalIdentity>,
     pub oauth_flows: Vec<OAuthFlow>,
@@ -76,6 +80,8 @@ impl Default for State {
             sessions: BTreeMap::new(),
             tokens: Vec::new(),
             notes: BTreeMap::new(),
+            files: BTreeMap::new(),
+            object_deletions: BTreeMap::new(),
             codes: Vec::new(),
             identities: Vec::new(),
             oauth_flows: Vec::new(),
@@ -478,6 +484,7 @@ fn delete_user(state: &mut State, id: UserId) -> bool {
             state.tokens.retain(|token| token.user_id != id);
             state.user_roles.retain(|(user, _)| *user != id);
             state.notes.retain(|_, note| note.owner_id() != id);
+            delete_files(state, |file| file.owner_id() == id);
             state.codes.retain(|code| code.user_id != id);
             state.identities.retain(|identity| identity.user_id != id);
             state.oauth_flows.retain(|flow| flow.link_user != Some(id));
@@ -838,6 +845,148 @@ impl AuditRepository for Mem {
                 .audit_events
                 .retain(|event| event.occurred_at >= cutoff);
             Ok((before - state.audit_events.len()) as u64)
+        })
+    }
+}
+
+fn delete_files(state: &mut State, doomed: impl Fn(&StoredFile) -> bool) -> usize {
+    let keys: Vec<ObjectKey> = state
+        .files
+        .values()
+        .filter(|file| doomed(file))
+        .map(|file| file.object_key().clone())
+        .collect();
+    state.files.retain(|_, file| !doomed(file));
+    for key in &keys {
+        state.object_deletions.insert(key.clone(), None);
+    }
+    keys.len()
+}
+
+impl Repository<StoredFile> for Mem {
+    async fn find_by_id(&mut self, id: FileId) -> Result<Option<StoredFile>, StorageError> {
+        self.with(|state| Ok(state.files.get(&id).cloned()))
+    }
+
+    async fn list(
+        &mut self,
+        filter: &FileFilter,
+        request: PageRequest,
+    ) -> Result<Page<StoredFile>, StorageError> {
+        self.with(|state| {
+            let matching: Vec<StoredFile> = state
+                .files
+                .values()
+                .filter(|file| filter.owner_id.is_none_or(|owner| file.owner_id() == owner))
+                .cloned()
+                .collect();
+            Ok(page(matching.into_iter(), &request, |file| {
+                file.id().as_uuid()
+            }))
+        })
+    }
+
+    async fn create(&mut self, id: FileId, input: &NewFile) -> Result<StoredFile, StorageError> {
+        self.with(|state| {
+            if !state.users.contains_key(&input.owner_id) {
+                return Err(StorageError::ForeignKeyViolation {
+                    constraint: "files_owner_id_fkey".to_owned(),
+                });
+            }
+            let file = StoredFile::from_parts(StoredFileParts {
+                id,
+                owner_id: input.owner_id,
+                name: input.name.clone(),
+                content_type: input.content_type.clone(),
+                size: input.size,
+                object_key: input.object_key.clone(),
+                created_at: START,
+                updated_at: START,
+            });
+            state.files.insert(file.id(), file.clone());
+            Ok(file)
+        })
+    }
+
+    async fn update(
+        &mut self,
+        id: FileId,
+        changes: &FileChanges,
+    ) -> Result<Option<StoredFile>, StorageError> {
+        self.with(|state| {
+            let Some(file) = state.files.get_mut(&id) else {
+                return Ok(None);
+            };
+            *file = StoredFile::from_parts(StoredFileParts {
+                id: file.id(),
+                owner_id: file.owner_id(),
+                name: changes.name.clone().unwrap_or_else(|| file.name().clone()),
+                content_type: file.content_type().clone(),
+                size: file.size(),
+                object_key: file.object_key().clone(),
+                created_at: file.created_at(),
+                updated_at: file.updated_at(),
+            });
+            Ok(Some(file.clone()))
+        })
+    }
+
+    async fn delete(&mut self, id: FileId) -> Result<bool, StorageError> {
+        self.with(|state| Ok(delete_files(state, |file| file.id() == id) > 0))
+    }
+}
+
+impl FileRepository for Mem {
+    async fn stored_bytes(&mut self, owner: UserId) -> Result<u64, StorageError> {
+        self.with(|state| {
+            Ok(state
+                .files
+                .values()
+                .filter(|file| file.owner_id() == owner)
+                .map(|file| file.size().bytes())
+                .sum())
+        })
+    }
+
+    async fn lock_storage(&mut self, _owner: UserId) -> Result<(), StorageError> {
+        self.with(|_| Ok(()))
+    }
+}
+
+impl ObjectDeletionRepository for Mem {
+    async fn schedule_object_deletion(
+        &mut self,
+        key: &ObjectKey,
+        due_at: Option<OffsetDateTime>,
+    ) -> Result<(), StorageError> {
+        self.with(|state| {
+            state.object_deletions.insert(key.clone(), due_at);
+            Ok(())
+        })
+    }
+
+    async fn cancel_object_deletion(&mut self, key: &ObjectKey) -> Result<bool, StorageError> {
+        self.with(|state| Ok(state.object_deletions.remove(key).is_some()))
+    }
+
+    async fn due_object_deletions(
+        &mut self,
+        now: OffsetDateTime,
+        limit: u32,
+    ) -> Result<Vec<ObjectKey>, StorageError> {
+        self.with(|state| {
+            let mut due: Vec<(Option<OffsetDateTime>, ObjectKey)> = state
+                .object_deletions
+                .iter()
+                .filter(|(_, due_at)| due_at.is_none_or(|at| at <= now))
+                .map(|(key, due_at)| (*due_at, key.clone()))
+                .collect();
+            due.sort();
+            Ok(due
+                .into_iter()
+                .take(limit as usize)
+                .map(|(_, key)| key)
+                .collect())
         })
     }
 }

@@ -8,7 +8,7 @@ pub fn export(dir: impl AsRef<Path>) -> io::Result<()> {
 /// lifetimes of links and codes, as TypeScript constants, so the frontend uses the server's
 /// numbers. The SQL `CHECK` constraints repeat them as a backstop; change both together.
 pub fn limits() -> String {
-    use domain::{mfa, note, passkey, user, user_token::TokenPolicy};
+    use domain::{file, mfa, note, passkey, user, user_token::TokenPolicy};
 
     use crate::{admin::dto as admin, auth::dto::LinkLifetimesDto};
 
@@ -25,6 +25,11 @@ pub fn limits() -> String {
         ("MAX_PASSKEY_NAME_LENGTH", passkey::MAX_PASSKEY_NAME_LEN),
         ("MAX_NOTE_TITLE_LENGTH", note::MAX_NOTE_TITLE_LEN),
         ("MAX_NOTE_BODY_LENGTH", note::MAX_NOTE_BODY_LEN),
+        ("MAX_FILE_NAME_LENGTH", file::MAX_FILE_NAME_LEN),
+        (
+            "MAX_FILE_SIZE",
+            usize::try_from(file::MAX_FILE_SIZE).unwrap_or(usize::MAX),
+        ),
         ("MIN_USER_SEARCH_LENGTH", admin::MIN_SEARCH_LEN),
         ("MAX_USER_SEARCH_LENGTH", admin::MAX_SEARCH_LEN),
         ("RECOVERY_CODE_COUNT", mfa::RECOVERY_CODE_COUNT),

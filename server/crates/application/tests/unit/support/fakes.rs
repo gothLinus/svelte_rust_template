@@ -3,7 +3,7 @@
 //! provider that record.
 
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{BTreeMap, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
     sync::{
         Arc, Mutex,
@@ -18,6 +18,7 @@ use domain::{
         ProviderProfile,
     },
     mail::{Mail, MailFuture, Mailer},
+    object_store::{ByteStream, NewObject, Object, ObjectKey, ObjectStore, ObjectStoreError},
     one_time_code::CodeChannel,
     passkey::PublicKeyAlgorithm,
     secret::{Secret, TokenHash},
@@ -29,6 +30,77 @@ use time::{Duration, OffsetDateTime, macros::datetime};
 use zeroize::Zeroizing;
 
 pub const START: OffsetDateTime = datetime!(2026-01-01 09:00 UTC);
+
+/// Objects in memory. `put` reads the body to its end and refuses one of another length than
+/// announced, like the real store; `set_down` makes every call fail.
+#[derive(Clone, Default)]
+pub struct FakeObjects {
+    objects: Arc<Mutex<BTreeMap<ObjectKey, Vec<u8>>>>,
+    down: Arc<Mutex<bool>>,
+}
+
+impl FakeObjects {
+    pub fn set_down(&self, down: bool) {
+        *self.down.lock().unwrap() = down;
+    }
+
+    pub fn keys(&self) -> Vec<ObjectKey> {
+        self.objects.lock().unwrap().keys().cloned().collect()
+    }
+
+    pub fn contents(&self, key: &ObjectKey) -> Option<Vec<u8>> {
+        self.objects.lock().unwrap().get(key).cloned()
+    }
+
+    fn check_up(&self) -> Result<(), ObjectStoreError> {
+        if *self.down.lock().unwrap() {
+            Err(ObjectStoreError::backend(std::io::Error::other(
+                "the store is down",
+            )))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl ObjectStore for FakeObjects {
+    async fn put(&self, key: &ObjectKey, object: NewObject) -> Result<(), ObjectStoreError> {
+        use futures_util::StreamExt;
+
+        self.check_up()?;
+        let mut body = object.body;
+        let mut contents = Vec::new();
+        while let Some(chunk) = body.next().await {
+            contents.extend_from_slice(&chunk?);
+        }
+        if contents.len() as u64 != object.length {
+            return Err(ObjectStoreError::body(std::io::Error::other(
+                "wrong length",
+            )));
+        }
+        self.objects.lock().unwrap().insert(key.clone(), contents);
+        Ok(())
+    }
+
+    async fn get(&self, key: &ObjectKey) -> Result<Option<Object>, ObjectStoreError> {
+        self.check_up()?;
+        Ok(self.objects.lock().unwrap().get(key).map(|contents| {
+            let body: ByteStream = Box::pin(futures_util::stream::iter([Ok(bytes::Bytes::from(
+                contents.clone(),
+            ))]));
+            Object {
+                length: contents.len() as u64,
+                body,
+            }
+        }))
+    }
+
+    async fn delete(&self, key: &ObjectKey) -> Result<(), ObjectStoreError> {
+        self.check_up()?;
+        self.objects.lock().unwrap().remove(key);
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct FakeClock(Arc<Mutex<OffsetDateTime>>);

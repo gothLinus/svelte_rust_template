@@ -25,7 +25,10 @@ use domain::{
     user::{UserId, UserRepository},
     user_token::TokenPolicy,
 };
-use fakes::{FakeClock, FakeCrypto, FakeHasher, FakeMailer, FakeProviders, FakeTexts, FakeTokens};
+use fakes::{
+    FakeClock, FakeCrypto, FakeHasher, FakeMailer, FakeObjects, FakeProviders, FakeTexts,
+    FakeTokens,
+};
 use i18n::Catalog;
 use memory::MemoryDb;
 
@@ -40,6 +43,7 @@ impl Adapters for Fakes {
     type Tokens = FakeTokens;
     type Crypto = FakeCrypto;
     type Clock = FakeClock;
+    type Objects = FakeObjects;
 }
 
 pub struct Fixture {
@@ -50,6 +54,7 @@ pub struct Fixture {
     pub mail: FakeMailer,
     pub texts: FakeTexts,
     pub providers: FakeProviders,
+    pub objects: FakeObjects,
     pub catalog: Arc<Catalog>,
 }
 
@@ -64,6 +69,7 @@ pub fn settings() -> Settings {
         links: Links::new(APP_URL),
         text_countries: Vec::new(),
         locale: Locale::EN,
+        file_quota: None,
     }
 }
 
@@ -88,12 +94,14 @@ impl Fixture {
         let mail = FakeMailer::default();
         let texts = FakeTexts::default();
         let providers = FakeProviders::default();
+        let objects = FakeObjects::default();
         let services = Services::new(Context::<Fakes> {
             db: db.clone(),
             hasher: hasher.clone(),
             tokens: FakeTokens::default(),
             crypto: FakeCrypto::default(),
             clock: clock.clone(),
+            objects: objects.clone(),
             mailer: Arc::new(mail.clone()),
             texts: Arc::new(texts.clone()),
             identity_providers: Arc::new(providers.clone()),
@@ -109,6 +117,7 @@ impl Fixture {
             mail,
             texts,
             providers,
+            objects,
             catalog,
         }
     }
