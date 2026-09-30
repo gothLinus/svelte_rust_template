@@ -7,6 +7,10 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+# Vocabulary for file contents in flight: `Bytes` chunks and the `Stream` trait. Both are
+# plain types without I/O or a runtime; the adapters on either side already speak them.
+bytes.workspace = true
+futures-core.workspace = true
 thiserror.workspace = true
 time = { workspace = true, features = ["std"] }
 uuid = { workspace = true, features = ["std", "v7"] }

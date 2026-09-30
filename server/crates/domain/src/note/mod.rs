@@ -29,6 +29,7 @@ use crate::{
     id::Id,
     pagination::NewestFirst,
     repository::{Resource, Version, Versioned},
+    unicode::is_bidi_override,
     user::UserId,
 };
 
@@ -54,7 +55,7 @@ impl NoteTitle {
                 "too_long",
                 Message::new("note-title-too-long").arg("max", MAX_NOTE_TITLE_LEN),
             ))
-        } else if title.chars().any(char::is_control) {
+        } else if title.chars().any(|c| c.is_control() || is_bidi_override(c)) {
             Err(ValidationError::new(
                 "invalid_characters",
                 Message::new("note-title-single-line"),

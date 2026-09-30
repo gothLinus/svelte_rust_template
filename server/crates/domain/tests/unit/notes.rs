@@ -13,9 +13,18 @@ fn title_rules() {
             .code(),
         "too_long"
     );
+    for title in ["two\nlines", "evil\u{202E}txt.exe", "isolated\u{2066}"] {
+        assert_eq!(
+            NoteTitle::parse(title).unwrap_err().code(),
+            "invalid_characters",
+            "{title:?}"
+        );
+    }
     assert_eq!(
-        NoteTitle::parse("two\nlines").unwrap_err().code(),
-        "invalid_characters"
+        NoteTitle::parse("\u{5E9}\u{5DC}\u{5D5}\u{5DD}\u{200F}")
+            .unwrap()
+            .as_str(),
+        "\u{5E9}\u{5DC}\u{5D5}\u{5DD}\u{200F}"
     );
     assert_eq!(NoteTitle::parse("Title").unwrap().to_string(), "Title");
 }

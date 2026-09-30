@@ -29,6 +29,9 @@ macro_rules! for_each_permission {
             NotesRead => "notes:read", "Read your own notes";
             NotesWrite => "notes:write", "Create, edit and delete your own notes";
             NotesManage => "notes:manage", "Read, edit and delete anyone's notes";
+            FilesRead => "files:read", "Read and download your own files";
+            FilesWrite => "files:write", "Upload, rename and delete your own files";
+            FilesManage => "files:manage", "Read, rename and delete anyone's files";
             UsersRead => "users:read", "List and view user accounts";
             UsersManage => "users:manage", "Assign roles, disable and enable accounts";
             AuditRead => "audit:read", "View the audit log of every account";

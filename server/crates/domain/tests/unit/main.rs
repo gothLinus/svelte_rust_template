@@ -4,6 +4,7 @@
 )]
 
 mod errors;
+mod files;
 mod ids;
 mod notes;
 mod pagination;

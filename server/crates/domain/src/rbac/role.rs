@@ -13,12 +13,14 @@ pub const MAX_ROLE_NAME_LEN: usize = 50;
 
 /// What the default role, [`RoleName::USER`], grants: every new account holds these.
 ///
-/// The migrations seed the same list and a Postgres test compares the two, so this is
-/// the one place tests (and anything else) learn what a fresh account may do. A feature
-/// whose permissions everyone gets adds them here and grants them to `user` in its own
-/// migration.
-pub const DEFAULT_USER_PERMISSIONS: &[Permission] =
-    &[Permission::NotesRead, Permission::NotesWrite];
+/// The migrations seed the same list and a Postgres test compares the two. A feature whose
+/// permissions everyone gets adds them here and grants them to `user` in its own migration.
+pub const DEFAULT_USER_PERMISSIONS: &[Permission] = &[
+    Permission::NotesRead,
+    Permission::NotesWrite,
+    Permission::FilesRead,
+    Permission::FilesWrite,
+];
 
 pub fn default_user_permissions() -> PermissionSet {
     DEFAULT_USER_PERMISSIONS.iter().copied().collect()
