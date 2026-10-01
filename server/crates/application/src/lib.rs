@@ -7,6 +7,7 @@
 //! - [`crud`] and [`policy`]: the generic create/read/update/delete flow and the authorization
 //!   rules it runs, reused by every resource.
 //! - [`notes`]: the reference resource built on them (copy it with `just new-resource`).
+//! - [`audit`]: reading back the security events the other use cases record.
 //! - [`account`], [`admin`] and the sign-in features ([`auth`], [`mfa`], [`oauth`], [`passkeys`],
 //!   [`passwordless`]): use cases specific to users, not meant to be copied.
 //! - [`Context`], [`Adapters`], [`Services`]: the ports and settings, and every service built
@@ -24,6 +25,7 @@ pub use services::Services;
 pub mod account;
 pub mod actor;
 pub mod admin;
+pub mod audit;
 pub mod auth;
 pub mod crud;
 pub mod dto;

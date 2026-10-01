@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into audit_events\n                (id, user_id, actor_id, action, detail, ip, user_agent, occurred_at)\n            values ($1, $2, $3, $4, $5, $6, $7, $8)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Inet",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4e91f6b3c39702cc01f3f0a3883c5c5f645917b74e140fa40c39645a1cd00f5e"
+}

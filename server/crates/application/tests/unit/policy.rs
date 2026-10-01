@@ -6,7 +6,7 @@ use application::{
 use domain::{
     note::{Note, NoteBody, NoteFilter, NoteId, NoteParts, NoteTitle},
     rbac::{Permission, PermissionSet},
-    session::SessionId,
+    session::{ClientInfo, SessionId},
     user::UserId,
 };
 use time::OffsetDateTime;
@@ -18,6 +18,7 @@ fn actor(permissions: &[Permission]) -> Actor {
         permissions: permissions.iter().copied().collect(),
         email_verified: true,
         recently_authenticated: true,
+        client: ClientInfo::default(),
     }
 }
 

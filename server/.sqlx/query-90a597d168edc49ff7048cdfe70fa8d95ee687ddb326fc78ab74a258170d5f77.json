@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                delete from audit_events\n                where id in (\n                    select id from audit_events where occurred_at < $1 limit $2\n                )\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "90a597d168edc49ff7048cdfe70fa8d95ee687ddb326fc78ab74a258170d5f77"
+}

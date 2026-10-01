@@ -31,6 +31,7 @@ macro_rules! for_each_permission {
             NotesManage => "notes:manage", "Read, edit and delete anyone's notes";
             UsersRead => "users:read", "List and view user accounts";
             UsersManage => "users:manage", "Assign roles, disable and enable accounts";
+            AuditRead => "audit:read", "View the audit log of every account";
         }
     };
 }

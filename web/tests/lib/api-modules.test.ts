@@ -256,6 +256,7 @@ describe('me', () => {
 		await api.me.reauthPasskeyOptions();
 		await api.me.reauthPasskey({ challengeId: 'c' });
 		await api.me.registerPasskey({ challengeId: 'c', name: 'Key' });
+		await api.me.activity({ limit: 3, after: 'c1' });
 
 		expect(sessions.map((session) => session.id)).toEqual(['s1']);
 		expect(sent(fetchFn, ReauthenticateRequestSchema, 21)).toEqual(
@@ -292,7 +293,8 @@ describe('me', () => {
 			'POST /me/reauthenticate/email-code',
 			'POST /me/reauthenticate/passkey/options',
 			'POST /me/reauthenticate/passkey',
-			'POST /me/passkeys'
+			'POST /me/passkeys',
+			'GET /me/activity?limit=3&after=c1'
 		]);
 	});
 });
@@ -352,6 +354,8 @@ describe('admin', () => {
 		await api.admin.revokeRole('u1', 'admin');
 		await api.admin.disable('u1');
 		await api.admin.enable('u1');
+		await api.admin.audit({ user: 'u1', limit: 5 });
+		await api.admin.audit();
 
 		expect(
 			fetchFn.mock.calls.map(
@@ -365,7 +369,9 @@ describe('admin', () => {
 			'PUT /admin/users/u1/roles/admin',
 			'DELETE /admin/users/u1/roles/admin',
 			'POST /admin/users/u1/disable',
-			'POST /admin/users/u1/enable'
+			'POST /admin/users/u1/enable',
+			'GET /admin/audit?user=u1&limit=5',
+			'GET /admin/audit'
 		]);
 	});
 });

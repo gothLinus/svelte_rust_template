@@ -6,9 +6,10 @@
 use std::sync::Arc;
 
 use domain::{
-    clock::Clock, database::Database, error::StorageError, identity::IdentityRepository,
-    mfa::MfaRepository, one_time_code::OneTimeCodeRepository, passkey::PasskeyRepository,
-    session::SessionRepository, user::UserRepository, user_token::UserTokenRepository,
+    audit::AuditRepository, clock::Clock, database::Database, error::StorageError,
+    identity::IdentityRepository, mfa::MfaRepository, one_time_code::OneTimeCodeRepository,
+    passkey::PasskeyRepository, session::SessionRepository, user::UserRepository,
+    user_token::UserTokenRepository,
 };
 use time::Duration;
 
@@ -21,6 +22,7 @@ pub struct Cleanup {
     pub sessions: u64,
     pub tokens: u64,
     pub accounts: u64,
+    pub audit_events: u64,
 }
 
 pub struct MaintenanceService<A: Adapters> {
@@ -34,8 +36,8 @@ impl<A: Adapters> MaintenanceService<A> {
 
     /// Deletes expired sessions, emailed links, one-time codes, provider sign-in flows and
     /// challenges, which are already ignored, so this only keeps the tables small. Also enforces
-    /// retention: abandoned authenticator app setups, and accounts never verified within
-    /// `UNVERIFIED_ACCOUNT_TTL`.
+    /// retention: abandoned authenticator app setups, accounts never verified within
+    /// `UNVERIFIED_ACCOUNT_TTL`, and audit events older than `AUDIT_LOG_RETENTION`.
     pub async fn delete_expired(&self) -> Result<Cleanup, StorageError> {
         let now = self.ctx.clock.now();
         let idle_cutoff = self.ctx.settings.sessions.idle_cutoff(now);
@@ -48,6 +50,10 @@ impl<A: Adapters> MaintenanceService<A> {
         if accounts > 0 {
             tracing::info!(accounts, "deleted accounts that were never verified");
         }
+        let audit_events = match self.ctx.settings.audit_retention {
+            Some(retention) => conn.delete_audit_events_before(now - retention).await?,
+            None => 0,
+        };
         Ok(Cleanup {
             sessions: conn.delete_expired_sessions(now, idle_cutoff).await?,
             tokens: conn.delete_expired_user_tokens(now).await?
@@ -57,6 +63,7 @@ impl<A: Adapters> MaintenanceService<A> {
                 + conn.delete_expired_mfa_challenges(now).await?
                 + conn.delete_stale_totp_setups(now - TOTP_SETUP_TTL).await?,
             accounts,
+            audit_events,
         })
     }
 }

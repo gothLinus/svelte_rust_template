@@ -1,4 +1,5 @@
 use domain::{
+    audit::{AuditAction, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
     mfa::{MfaChallenge, MfaRepository},
@@ -7,7 +8,6 @@ use domain::{
     session::{ClientInfo, Session},
     user::{User, UserId},
 };
-use time::OffsetDateTime;
 
 use crate::{
     Adapters, Context, Store,
@@ -93,6 +93,7 @@ pub(crate) async fn complete_first_step<A: Adapters>(
     user: &User,
     client: ClientInfo,
     previous: Option<&Secret>,
+    method: AuthMethod<'_>,
 ) -> Result<LoginOutcome, AppError> {
     ensure_can_sign_in(ctx, user)?;
     let now = ctx.clock.now();
@@ -115,21 +116,23 @@ pub(crate) async fn complete_first_step<A: Adapters>(
         }));
     }
 
-    let signed_in = start_session(ctx, &mut tx, user, client, previous, now).await?;
+    let signed_in = start_session(ctx, &mut tx, user, client, previous, method).await?;
     tx.commit().await?;
     Ok(LoginOutcome::SignedIn(Box::new(signed_in)))
 }
 
 /// Starts a session for a user who proved every factor they need: revokes `previous`, stores a new
-/// session under the digest of a fresh token and returns the token once.
+/// session under the digest of a fresh token, records the sign-in (`method` is the last factor
+/// proven) and returns the token once.
 pub(crate) async fn start_session<A: Adapters>(
     ctx: &Context<A>,
     store: &mut impl Store,
     user: &User,
     client: ClientInfo,
     previous: Option<&Secret>,
-    now: OffsetDateTime,
+    method: AuthMethod<'_>,
 ) -> Result<SignedIn, AppError> {
+    let now = ctx.clock.now();
     if let Some(previous) = previous {
         store
             .delete_session_by_token(&ctx.tokens.digest(previous))
@@ -144,6 +147,12 @@ pub(crate) async fn start_session<A: Adapters>(
         &ctx.settings.sessions,
     );
     store.create_session(&session).await?;
+    store
+        .record_audit_event(
+            &ctx.event(user.id(), AuditAction::SignedIn, session.client())
+                .detail(method.detail()),
+        )
+        .await?;
     let me = load_me(store, user).await?;
     tracing::info!(user_id = %user.id(), session_id = %session.id(), "signed in");
     Ok(SignedIn { me, session, token })

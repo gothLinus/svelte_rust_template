@@ -1,8 +1,14 @@
-import { RoleListSchema, UserPageSchema, UserSchema } from '$lib/types/api';
+import { AuditEventPageSchema, RoleListSchema, UserPageSchema, UserSchema } from '$lib/types/api';
 import { type ApiClient, message, segment } from './client';
 
 export interface ListUsersQuery {
 	search?: string;
+	limit?: number;
+	after?: string;
+}
+
+export interface ListAuditQuery {
+	user?: string;
 	limit?: number;
 	after?: string;
 }
@@ -21,6 +27,8 @@ export function adminApi(client: ApiClient) {
 		revokeRole: (id: string, role: string) =>
 			client.delete(`/admin/users/${segment(id)}/roles/${segment(role)}`, { response: user }),
 		disable: (id: string) => client.post(`/admin/users/${segment(id)}/disable`, { response: user }),
-		enable: (id: string) => client.post(`/admin/users/${segment(id)}/enable`, { response: user })
+		enable: (id: string) => client.post(`/admin/users/${segment(id)}/enable`, { response: user }),
+		audit: (query: ListAuditQuery = {}) =>
+			client.get('/admin/audit', { query: { ...query }, response: message(AuditEventPageSchema) })
 	};
 }

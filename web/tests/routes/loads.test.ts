@@ -5,6 +5,7 @@ import { FALLBACK_APP_NAME, SESSION } from '$lib/auth';
 import { load as rootLoad } from '../../src/routes/+layout';
 import { load as appLoad } from '../../src/routes/(app)/+layout';
 import { load as adminLoad } from '../../src/routes/(app)/admin/+layout';
+import { load as auditLoad } from '../../src/routes/(app)/admin/audit/+page';
 import { load as usersLoad } from '../../src/routes/(app)/admin/users/+page';
 import { load as dashboardLoad } from '../../src/routes/(app)/dashboard/+page';
 import { load as notesLoad } from '../../src/routes/(app)/notes/+page';
@@ -12,6 +13,7 @@ import { load as settingsLoad } from '../../src/routes/(app)/settings/+page';
 import { load as securityLoad } from '../../src/routes/(app)/settings/security/+page';
 import { load as guestLoad } from '../../src/routes/(public)/(guest)/+layout';
 import {
+	AuditEventPageSchema,
 	AuthMethodsSchema,
 	MeSchema,
 	NotePageSchema,
@@ -117,10 +119,12 @@ describe('(app) layout', () => {
 });
 
 describe('admin layout', () => {
-	it('needs users:read', async () => {
-		await expect(
-			adminLoad(loadEvent({ parent: async () => ({ me: me([Permission.USERS_READ]) }) }))
-		).resolves.toBeUndefined();
+	it('needs users:read or audit:read', async () => {
+		for (const permission of [Permission.USERS_READ, Permission.AUDIT_READ]) {
+			await expect(
+				adminLoad(loadEvent({ parent: async () => ({ me: me([permission]) }) }))
+			).resolves.toBeUndefined();
+		}
 
 		const error = await rejection(adminLoad(loadEvent({ parent: async () => ({ me: me() }) })));
 		expect(isHttpError(error, 403)).toBe(true);
@@ -214,7 +218,8 @@ describe('page loads', () => {
 			loadEvent({
 				fetch: routeFetch({
 					'/me/sessions': reply(SessionListSchema, { sessions: [{ id: 's1' }] }),
-					'/me/security': reply(SecurityOverviewSchema, { hasPassword: true })
+					'/me/security': reply(SecurityOverviewSchema, { hasPassword: true }),
+					'/me/activity': reply(AuditEventPageSchema, { items: [{ id: 'e1' }] })
 				}),
 				parent: async () => ({ me: me() }),
 				depends
@@ -222,9 +227,10 @@ describe('page loads', () => {
 		);
 		expect(data).toMatchObject({
 			sessions: [{ id: 's1' }],
-			security: { hasPassword: true, passkeys: [] }
+			security: { hasPassword: true, passkeys: [] },
+			activity: { items: [{ id: 'e1' }] }
 		});
-		expect(depends).toHaveBeenCalledWith('app:sessions', 'app:security');
+		expect(depends).toHaveBeenCalledWith('app:sessions', 'app:security', 'app:audit');
 	});
 
 	it('admin users: search, cursor and roles', async () => {
@@ -249,6 +255,53 @@ describe('page loads', () => {
 		expect(String(fetchFn.mock.calls[0]?.[0])).toBe(
 			`${API_BASE}/admin/users?search=ali&after=c1&limit=20`
 		);
+	});
+
+	it('admin users: needs users:read even though the area admits audit:read', async () => {
+		const error = await rejection(
+			usersLoad(
+				loadEvent({
+					fetch: mockFetch(reply(UserPageSchema)),
+					parent: async () => ({ me: me([Permission.AUDIT_READ]) }),
+					depends: vi.fn(),
+					url: new URL('http://app.test/admin/users')
+				})
+			)
+		);
+		expect(isHttpError(error, 403)).toBe(true);
+	});
+
+	it('audit log: needs audit:read and reads the user filter and cursor', async () => {
+		const fetchFn = mockFetch(reply(AuditEventPageSchema, { nextCursor: 'c2' }));
+		const depends = vi.fn();
+		const data = loaded(
+			await auditLoad(
+				loadEvent({
+					fetch: fetchFn,
+					parent: async () => ({ me: me([Permission.AUDIT_READ]) }),
+					depends,
+					url: new URL('http://app.test/admin/audit?user=u1&after=c1')
+				})
+			)
+		);
+
+		expect(data).toMatchObject({ user: 'u1', after: 'c1', events: { nextCursor: 'c2' } });
+		expect(String(fetchFn.mock.calls[0]?.[0])).toBe(
+			`${API_BASE}/admin/audit?user=u1&after=c1&limit=25`
+		);
+		expect(depends).toHaveBeenCalledWith('app:audit');
+
+		const error = await rejection(
+			auditLoad(
+				loadEvent({
+					fetch: fetchFn,
+					parent: async () => ({ me: me([Permission.USERS_READ]) }),
+					depends,
+					url: new URL('http://app.test/admin/audit')
+				})
+			)
+		);
+		expect(isHttpError(error, 403)).toBe(true);
 	});
 
 	it('settings redirects to the profile', () => {

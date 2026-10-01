@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use domain::{
+    audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
     i18n::Message,
@@ -204,6 +205,13 @@ impl<A: Adapters> PasskeyService<A> {
         } else {
             None
         };
+        tx.record_audit_event(
+            &self
+                .ctx
+                .actor_event(actor, AuditAction::PasskeyAdded)
+                .detail(passkey.name.as_str()),
+        )
+        .await?;
         tx.commit().await?;
 
         self.notify(
@@ -246,6 +254,8 @@ impl<A: Adapters> PasskeyService<A> {
         if second_factors(&mut tx, actor.user_id).await?.is_empty() {
             tx.replace_recovery_codes(actor.user_id, &[]).await?;
         }
+        tx.record_audit_event(&self.ctx.actor_event(actor, AuditAction::PasskeyRemoved))
+            .await?;
         tx.commit().await?;
 
         self.notify(actor.user_id, Message::new("notice-passkey-removed"))
@@ -297,8 +307,15 @@ impl<A: Adapters> PasskeyService<A> {
         signin::ensure_can_sign_in(&self.ctx, &user)?;
 
         let mut tx = self.ctx.db.transaction().await?;
-        let signed_in =
-            signin::start_session(&self.ctx, &mut tx, &user, client, previous, now).await?;
+        let signed_in = signin::start_session(
+            &self.ctx,
+            &mut tx,
+            &user,
+            client,
+            previous,
+            AuthMethod::Passkey,
+        )
+        .await?;
         tx.commit().await?;
         Ok(signed_in)
     }
@@ -362,9 +379,10 @@ impl<A: Adapters> PasskeyService<A> {
             None => None,
         };
         if verified.is_none() {
+            challenge::record_failure(&self.ctx, &pending, &client, AuthMethod::Passkey).await?;
             return Err(AppError::InvalidPasskey);
         }
-        challenge::finish(&self.ctx, &pending, client, previous).await
+        challenge::finish(&self.ctx, &pending, client, previous, AuthMethod::Passkey).await
     }
 
     /// Options for re-authenticating the actor with one of their passkeys, with user verification
@@ -419,7 +437,7 @@ impl<A: Adapters> PasskeyService<A> {
         if user.id() != actor.user_id {
             return Err(AppError::InvalidPasskey);
         }
-        crate::auth::reauth::mark(&self.ctx, actor).await
+        crate::auth::reauth::mark(&self.ctx, actor, AuthMethod::Passkey).await
     }
 
     /// Checks an assertion and returns the passkey's user. The challenge is already consumed by the

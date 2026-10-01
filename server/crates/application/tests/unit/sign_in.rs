@@ -423,6 +423,7 @@ async fn changing_the_email_needs_the_link_sent_to_the_new_address() {
                 token: SecretInput(fx.mail.token_for("new@example.com")),
             },
             None,
+            ClientInfo::default(),
         )
         .await
         .unwrap();
@@ -1494,6 +1495,7 @@ async fn confirm_change(fx: &Fixture, new: &str) -> Result<(), AppError> {
                 token: SecretInput(fx.mail.token_for(new)),
             },
             None,
+            ClientInfo::default(),
         )
         .await
 }
@@ -1524,6 +1526,7 @@ async fn an_email_change_loses_to_whoever_took_the_address_meanwhile() {
                 token: SecretInput(link),
             },
             None,
+            ClientInfo::default(),
         )
         .await
         .unwrap_err();
@@ -1562,9 +1565,12 @@ async fn undoing_an_email_change_fails_once_the_old_address_is_taken() {
     let err = fx
         .services
         .auth
-        .cancel_email_change(application::auth::dto::CancelEmailChangeRequest {
-            token: SecretInput(cancel),
-        })
+        .cancel_email_change(
+            application::auth::dto::CancelEmailChangeRequest {
+                token: SecretInput(cancel),
+            },
+            ClientInfo::default(),
+        )
         .await
         .unwrap_err();
     assert_eq!(err.code(), "email_taken");

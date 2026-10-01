@@ -3,6 +3,7 @@ export {
 	SESSION,
 	loginUrl,
 	redirectIfSignedIn,
+	requireAnyPermission,
 	requirePermission,
 	requireUser,
 	safeRedirect

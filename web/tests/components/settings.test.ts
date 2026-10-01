@@ -8,6 +8,8 @@ import { t } from '$lib/i18n';
 import { type MessageInitShape, create } from '@bufbuild/protobuf';
 import {
 	AddPhoneRequestSchema,
+	type AuditEventPage,
+	AuditEventPageSchema,
 	CodeRequestSchema,
 	MeSchema,
 	PasskeySchema,
@@ -86,12 +88,42 @@ const providers = [
 	{ id: 'google', name: 'Google' }
 ];
 
-function renderSecurity(overview = security()) {
+function activity(overrides: MessageInitShape<typeof AuditEventPageSchema> = {}): AuditEventPage {
+	return create(AuditEventPageSchema, {
+		items: [
+			{
+				id: 'e3',
+				action: 'role_granted',
+				detail: 'admin',
+				byOther: true,
+				occurredAt: ts('2026-01-03T00:00:00Z')
+			},
+			{
+				id: 'e2',
+				action: 'sign_in_failed',
+				detail: 'password',
+				ip: '192.0.2.9',
+				userAgent: FIREFOX,
+				occurredAt: ts('2026-01-02T00:00:00Z')
+			},
+			{
+				id: 'e1',
+				action: 'signed_in',
+				detail: 'provider:github',
+				occurredAt: ts('2026-01-01T00:00:00Z')
+			}
+		],
+		...overrides
+	});
+}
+
+function renderSecurity(overview = security(), events = activity()) {
 	return render(SecurityPage, {
 		data: {
 			...rootData(me(), { providers }),
 			security: overview,
-			sessions: [sessionRow('s1', FIREFOX, true), sessionRow('s2', IPHONE)]
+			sessions: [sessionRow('s1', FIREFOX, true), sessionRow('s2', IPHONE)],
+			activity: events
 		}
 	});
 }
@@ -110,7 +142,8 @@ describe('security page', () => {
 			`${t('security-two-step-title')} ${t('security-two-step-on')}`,
 			t('security-passkeys-title'),
 			t('security-linked-title'),
-			t('security-sessions-title')
+			t('security-sessions-title'),
+			t('security-activity-title')
 		]) {
 			expect(screen.getByRole('heading', { level: 2, name: heading })).toBeInTheDocument();
 		}
@@ -321,6 +354,47 @@ describe('security page details', () => {
 		expect(
 			screen.getByText(t('security-passkeys-description-enables-two-step'))
 		).toBeInTheDocument();
+	});
+
+	it('words recent activity with how it was proven and who caused it', () => {
+		renderSecurity();
+		const card = within(
+			screen
+				.getByRole('heading', { level: 2, name: t('security-activity-title') })
+				.closest('[data-slot="card"]') as HTMLElement
+		);
+
+		expect(card.getByText(t('audit-action-role-granted'))).toBeInTheDocument();
+		expect(card.getByText('admin')).toBeInTheDocument();
+		expect(card.getByText(t('security-activity-by-admin'))).toBeInTheDocument();
+		expect(card.getByText(t('audit-action-sign-in-failed'))).toHaveClass('text-destructive');
+		expect(card.getByText(t('audit-method-password'))).toBeInTheDocument();
+		expect(card.getByText(FIREFOX_MACOS)).toBeInTheDocument();
+		expect(card.getByText('192.0.2.9')).toBeInTheDocument();
+		// A social sign-in names the provider.
+		expect(card.getByText('GitHub')).toBeInTheDocument();
+		expect(card.queryByRole('button', { name: t('security-activity-more') })).toBeNull();
+	});
+
+	it('loads more activity after the last event', async () => {
+		const fetchFn = mockFetch(
+			reply(AuditEventPageSchema, {
+				items: [{ id: 'e0', action: 'registered', occurredAt: ts('2025-12-31T00:00:00Z') }]
+			})
+		);
+		vi.stubGlobal('fetch', fetchFn);
+		renderSecurity(security(), activity({ nextCursor: 'next' }));
+
+		await fireEvent.click(screen.getByRole('button', { name: t('security-activity-more') }));
+
+		expect(await screen.findByText(t('audit-action-registered'))).toBeInTheDocument();
+		expect(callOf(fetchFn)[0]).toBe('/api/v1/me/activity?after=next&limit=10');
+		expect(screen.queryByRole('button', { name: t('security-activity-more') })).toBeNull();
+	});
+
+	it('shows that nothing happened yet', () => {
+		renderSecurity(security(), activity({ items: [] }));
+		expect(screen.getByText(t('security-activity-empty'))).toBeInTheDocument();
 	});
 
 	it('follows the language in use, English where a message is missing', async () => {

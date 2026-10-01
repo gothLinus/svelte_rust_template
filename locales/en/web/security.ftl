@@ -122,3 +122,12 @@ security-sessions-everywhere = Sign out everywhere
 security-sessions-everywhere-title = Sign out everywhere?
 security-sessions-everywhere-description = Every browser and device is signed out, this one included. You need to sign in again.
 security-sessions-everywhere-done = Signed out on every device.
+
+## Recent activity
+
+security-activity-title = Recent activity
+security-activity-description = Sign-ins and changes to how you sign in. If you do not recognize one, change your password and sign out everywhere.
+security-activity-empty = Nothing yet.
+security-activity-more = Show more
+# Marks an event an administrator caused.
+security-activity-by-admin = By an administrator

@@ -7,13 +7,18 @@ use std::sync::Arc;
 
 use application::Adapters;
 use axum::{
+    RequestPartsExt,
     extract::{Request, State},
     middleware::Next,
     response::{IntoResponse, Response},
 };
 use axum_extra::extract::CookieJar;
 
-use crate::{extract::Authentication, problem::ApiError, state::AppState};
+use crate::{
+    extract::{Authentication, Client},
+    problem::ApiError,
+    state::AppState,
+};
 
 /// Looks up the session behind the cookie and stores it as an [`Authentication`] extension for the
 /// extractors. Afterwards it keeps the browser's cookie in sync:
@@ -33,7 +38,10 @@ pub async fn authenticate<A: Adapters>(
     let mut rotated = None;
     let mut clear_cookie = false;
     if let Some(token) = &token {
-        match state.services.auth.authenticate(token).await? {
+        let (mut parts, body) = request.into_parts();
+        let Ok(Client(client)) = parts.extract_with_state::<Client, _>(&state).await;
+        request = Request::from_parts(parts, body);
+        match state.services.auth.authenticate(token, client).await? {
             Some(authenticated) => {
                 rotated.clone_from(&authenticated.rotated_token);
                 request

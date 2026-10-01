@@ -1,5 +1,6 @@
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import NotebookPenIcon from '@lucide/svelte/icons/notebook-pen';
+import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 import UserRoundIcon from '@lucide/svelte/icons/user-round';
 import UsersIcon from '@lucide/svelte/icons/users';
@@ -62,7 +63,10 @@ export const navigation: NavGroup[] = [
 	),
 	group(
 		() => t('nav-administration'),
-		[page(() => t('nav-users'), '/admin/users', UsersIcon, Permission.USERS_READ)]
+		[
+			page(() => t('nav-users'), '/admin/users', UsersIcon, Permission.USERS_READ),
+			page(() => t('nav-audit'), '/admin/audit', ScrollTextIcon, Permission.AUDIT_READ)
+		]
 	)
 ];
 

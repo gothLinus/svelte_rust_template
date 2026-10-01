@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use domain::{
+    audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
     i18n::Message,
@@ -207,7 +208,7 @@ impl<A: Adapters> OAuthService<A> {
                     .filter(|actor| actor.user_id == user)
                     .ok_or_else(invalid_state)?;
                 actor.require_verified_email()?;
-                self.link(user, &provider, &profile).await?;
+                self.link(actor, &provider, &profile).await?;
                 OAuthOutcome::Linked
             }
             None => match self.sign_in(&provider, &profile, client, previous).await? {
@@ -239,16 +240,18 @@ impl<A: Adapters> OAuthService<A> {
     /// Needs a recent sign-in.
     pub async fn unlink(&self, actor: &Actor, provider: &str) -> Result<(), AppError> {
         actor.require_recent_authentication()?;
-        if !self
-            .ctx
-            .db
-            .connection()
-            .await?
-            .delete_user_identity(actor.user_id, provider)
-            .await?
-        {
+        let mut tx = self.ctx.db.transaction().await?;
+        if !tx.delete_user_identity(actor.user_id, provider).await? {
             return Err(AppError::NotFound);
         }
+        tx.record_audit_event(
+            &self
+                .ctx
+                .actor_event(actor, AuditAction::IdentityUnlinked)
+                .detail(provider),
+        )
+        .await?;
+        tx.commit().await?;
         tracing::info!(user_id = %actor.user_id, provider, "social account unlinked");
         Ok(())
     }
@@ -272,12 +275,26 @@ impl<A: Adapters> OAuthService<A> {
                 .await?
                 .ok_or_else(invalid_state)?;
             drop(conn);
-            return signin::complete_first_step(&self.ctx, &user, client, previous).await;
+            return signin::complete_first_step(
+                &self.ctx,
+                &user,
+                client,
+                previous,
+                AuthMethod::Provider(provider.as_str()),
+            )
+            .await;
         }
         drop(conn);
 
-        let user = self.sign_up(provider, profile).await?;
-        signin::complete_first_step(&self.ctx, &user, client, previous).await
+        let user = self.sign_up(provider, profile, &client).await?;
+        signin::complete_first_step(
+            &self.ctx,
+            &user,
+            client,
+            previous,
+            AuthMethod::Provider(provider.as_str()),
+        )
+        .await
     }
 
     /// Creates an account for someone new. An existing account with the same address is never taken
@@ -291,6 +308,7 @@ impl<A: Adapters> OAuthService<A> {
         &self,
         provider: &ProviderId,
         profile: &ProviderProfile,
+        client: &ClientInfo,
     ) -> Result<User, AppError> {
         let email = profile
             .email
@@ -348,6 +366,13 @@ impl<A: Adapters> OAuthService<A> {
             email: profile.email.clone(),
         })
         .await?;
+        tx.record_audit_event(
+            &self
+                .ctx
+                .event(user.id(), AuditAction::Registered, client)
+                .detail(AuthMethod::Provider(provider.as_str()).detail()),
+        )
+        .await?;
         tx.commit().await?;
 
         tracing::info!(user_id = %user.id(), %provider, "account registered through a provider");
@@ -356,12 +381,13 @@ impl<A: Adapters> OAuthService<A> {
 
     async fn link(
         &self,
-        user: domain::user::UserId,
+        actor: &Actor,
         provider: &ProviderId,
         profile: &ProviderProfile,
     ) -> Result<(), AppError> {
-        let mut conn = self.ctx.db.connection().await?;
-        if let Some(existing) = conn
+        let user = actor.user_id;
+        let mut tx = self.ctx.db.transaction().await?;
+        if let Some(existing) = tx
             .find_identity(provider.as_str(), &profile.subject)
             .await?
         {
@@ -371,7 +397,7 @@ impl<A: Adapters> OAuthService<A> {
                 Err(identity_taken())
             };
         }
-        let linked = conn
+        let linked = tx
             .create_identity(&NewIdentity {
                 id: domain::identity::IdentityId::generate_at(self.ctx.clock.now()),
                 user_id: user,
@@ -393,8 +419,15 @@ impl<A: Adapters> OAuthService<A> {
             }
             Err(err) => return Err(err.into()),
         }
-        let owner = conn.find_user(user).await?;
-        drop(conn);
+        tx.record_audit_event(
+            &self
+                .ctx
+                .actor_event(actor, AuditAction::IdentityLinked)
+                .detail(provider.as_str()),
+        )
+        .await?;
+        let owner = tx.find_user(user).await?;
+        tx.commit().await?;
 
         if let Some(owner) = owner {
             let what = Message::new("notice-identity-linked")

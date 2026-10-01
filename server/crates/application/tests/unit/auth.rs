@@ -139,6 +139,7 @@ async fn with_required_verification_registration_does_not_sign_in() {
                 registration: Some(&browser),
                 ..Browser::default()
             },
+            ClientInfo::default(),
         )
         .await
         .unwrap();
@@ -277,7 +278,7 @@ async fn login_revokes_the_session_it_replaces() {
     assert!(
         fx.services
             .auth
-            .authenticate(&first.token)
+            .authenticate(&first.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()
@@ -285,7 +286,7 @@ async fn login_revokes_the_session_it_replaces() {
     assert!(
         fx.services
             .auth
-            .authenticate(&second.token)
+            .authenticate(&second.token, ClientInfo::default())
             .await
             .unwrap()
             .is_some()
@@ -301,7 +302,7 @@ async fn sessions_expire_after_the_idle_timeout() {
     assert!(
         fx.services
             .auth
-            .authenticate(&signed_in.token)
+            .authenticate(&signed_in.token, ClientInfo::default())
             .await
             .unwrap()
             .is_some()
@@ -311,7 +312,7 @@ async fn sessions_expire_after_the_idle_timeout() {
     assert!(
         fx.services
             .auth
-            .authenticate(&signed_in.token)
+            .authenticate(&signed_in.token, ClientInfo::default())
             .await
             .unwrap()
             .is_some()
@@ -321,7 +322,7 @@ async fn sessions_expire_after_the_idle_timeout() {
     assert!(
         fx.services
             .auth
-            .authenticate(&signed_in.token)
+            .authenticate(&signed_in.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()
@@ -339,7 +340,7 @@ async fn sessions_end_at_the_absolute_lifetime_however_active() {
         assert!(
             fx.services
                 .auth
-                .authenticate(&signed_in.token)
+                .authenticate(&signed_in.token, ClientInfo::default())
                 .await
                 .unwrap()
                 .is_some()
@@ -349,7 +350,7 @@ async fn sessions_end_at_the_absolute_lifetime_however_active() {
     assert!(
         fx.services
             .auth
-            .authenticate(&signed_in.token)
+            .authenticate(&signed_in.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()
@@ -380,7 +381,7 @@ async fn garbage_tokens_do_not_authenticate() {
         assert!(
             fx.services
                 .auth
-                .authenticate(&Secret::new(token))
+                .authenticate(&Secret::new(token), ClientInfo::default())
                 .await
                 .unwrap()
                 .is_none()
@@ -407,7 +408,7 @@ async fn a_pending_rotation_hands_out_a_new_token_once() {
     assert!(
         fx.services
             .auth
-            .authenticate(&alice.token)
+            .authenticate(&alice.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()
@@ -448,7 +449,7 @@ async fn logout_ends_one_session_and_logout_everywhere_ends_all() {
     assert!(
         fx.services
             .auth
-            .authenticate(&first.token)
+            .authenticate(&first.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()
@@ -459,7 +460,7 @@ async fn logout_ends_one_session_and_logout_everywhere_ends_all() {
     assert!(
         fx.services
             .auth
-            .authenticate(&third.token)
+            .authenticate(&third.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()
@@ -483,6 +484,7 @@ async fn verification_links_work_once_and_expire() {
                 session: Some(&alice.token),
                 ..Browser::default()
             },
+            ClientInfo::default(),
         )
         .await
         .unwrap();
@@ -497,7 +499,7 @@ async fn verification_links_work_once_and_expire() {
     let err = fx
         .services
         .auth
-        .verify_email(verify(&token), Browser::default())
+        .verify_email(verify(&token), Browser::default(), ClientInfo::default())
         .await
         .unwrap_err();
     assert_eq!(err.code(), "invalid_token");
@@ -508,7 +510,7 @@ async fn verification_links_work_once_and_expire() {
     let err = fx
         .services
         .auth
-        .verify_email(verify(&token), Browser::default())
+        .verify_email(verify(&token), Browser::default(), ClientInfo::default())
         .await
         .unwrap_err();
     assert_eq!(err.code(), "invalid_token");
@@ -535,13 +537,13 @@ async fn resending_verification_invalidates_the_old_link() {
     assert!(matches!(
         fx.services
             .auth
-            .verify_email(request(old), Browser::default())
+            .verify_email(request(old), Browser::default(), ClientInfo::default())
             .await,
         Err(AppError::InvalidToken)
     ));
     fx.services
         .auth
-        .verify_email(request(new), Browser::default())
+        .verify_email(request(new), Browser::default(), ClientInfo::default())
         .await
         .unwrap();
 
@@ -604,14 +606,17 @@ async fn password_reset_sets_the_password_and_signs_out_everywhere() {
     };
     fx.services
         .auth
-        .reset_password(reset(token.clone(), "a brand new password"))
+        .reset_password(
+            reset(token.clone(), "a brand new password"),
+            ClientInfo::default(),
+        )
         .await
         .unwrap();
 
     assert!(
         fx.services
             .auth
-            .authenticate(&alice.token)
+            .authenticate(&alice.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()
@@ -638,7 +643,7 @@ async fn password_reset_sets_the_password_and_signs_out_everywhere() {
     let err = fx
         .services
         .auth
-        .reset_password(reset(token, "another new password"))
+        .reset_password(reset(token, "another new password"), ClientInfo::default())
         .await
         .unwrap_err();
     assert_eq!(err.code(), "invalid_token");
@@ -660,10 +665,13 @@ async fn reset_links_expire_and_need_a_valid_password() {
     let err = fx
         .services
         .auth
-        .reset_password(ResetPasswordRequest {
-            token: application::dto::SecretInput(token.clone()),
-            password: secret("short"),
-        })
+        .reset_password(
+            ResetPasswordRequest {
+                token: application::dto::SecretInput(token.clone()),
+                password: secret("short"),
+            },
+            ClientInfo::default(),
+        )
         .await
         .unwrap_err();
     assert_eq!(err.code(), "validation_failed");
@@ -672,10 +680,13 @@ async fn reset_links_expire_and_need_a_valid_password() {
     let err = fx
         .services
         .auth
-        .reset_password(ResetPasswordRequest {
-            token: application::dto::SecretInput(token),
-            password: secret("long enough password"),
-        })
+        .reset_password(
+            ResetPasswordRequest {
+                token: application::dto::SecretInput(token),
+                password: secret("long enough password"),
+            },
+            ClientInfo::default(),
+        )
         .await
         .unwrap_err();
     assert_eq!(err.code(), "invalid_token");
@@ -791,6 +802,7 @@ async fn with_required_verification_only_verified_accounts_keep_their_sessions()
                 registration: Some(&browser),
                 ..Browser::default()
             },
+            ClientInfo::default(),
         )
         .await
         .unwrap();
@@ -808,7 +820,7 @@ async fn with_required_verification_only_verified_accounts_keep_their_sessions()
     assert!(
         fx.services
             .auth
-            .authenticate(&signed_in.token)
+            .authenticate(&signed_in.token, ClientInfo::default())
             .await
             .unwrap()
             .is_some()
@@ -825,7 +837,7 @@ async fn with_required_verification_only_verified_accounts_keep_their_sessions()
     assert!(
         fx.services
             .auth
-            .authenticate(&signed_in.token)
+            .authenticate(&signed_in.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()

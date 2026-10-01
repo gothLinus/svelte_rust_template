@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use domain::{
+    audit::AuthMethod,
     clock::Clock,
     database::{Database, Transaction},
     i18n::Message,
@@ -122,8 +123,8 @@ impl<A: Adapters> PasswordlessService<A> {
         checked?;
         let user = user.ok_or_else(AppError::invalid_code)?;
 
-        let user = self.email_proven(&user).await?;
-        signin::complete_first_step(&self.ctx, &user, client, previous).await
+        let user = self.email_proven(&user, &client).await?;
+        signin::complete_first_step(&self.ctx, &user, client, previous, AuthMethod::EmailCode).await
     }
 
     /// Signs in with the link from the email. The link works once, and retires the code from the
@@ -164,8 +165,8 @@ impl<A: Adapters> PasswordlessService<A> {
             .await?
             .ok_or(AppError::InvalidToken)?;
 
-        let user = self.email_proven(&user).await?;
-        signin::complete_first_step(&self.ctx, &user, client, previous).await
+        let user = self.email_proven(&user, &client).await?;
+        signin::complete_first_step(&self.ctx, &user, client, previous, AuthMethod::MagicLink).await
     }
 
     /// The checks of [`PasswordlessService::request_phone_code`] that do not depend on whether the
@@ -249,7 +250,7 @@ impl<A: Adapters> PasswordlessService<A> {
         checked?;
         let user = user.ok_or_else(AppError::invalid_code)?;
 
-        signin::complete_first_step(&self.ctx, &user, client, previous).await
+        signin::complete_first_step(&self.ctx, &user, client, previous, AuthMethod::PhoneCode).await
     }
 
     fn ensure_channel(&self, channel: CodeChannel) -> Result<(), AppError> {
@@ -263,7 +264,7 @@ impl<A: Adapters> PasswordlessService<A> {
         }
     }
 
-    async fn email_proven(&self, user: &User) -> Result<User, AppError> {
+    async fn email_proven(&self, user: &User, client: &ClientInfo) -> Result<User, AppError> {
         let mut tx = self.ctx.db.transaction().await?;
         tx.delete_user_tokens(user.id(), TokenPurpose::MagicLink)
             .await?;
@@ -274,6 +275,7 @@ impl<A: Adapters> PasswordlessService<A> {
             user.id(),
             self.ctx.clock.now(),
             access::Prover::Owner,
+            client,
         )
         .await?;
         tx.commit().await?;

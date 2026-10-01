@@ -1,8 +1,9 @@
 use domain::{
+    audit::{AuditAction, NewAuditEvent},
     clock::Clock,
     database::Database,
     one_time_code::CodePurpose,
-    session::SessionId,
+    session::{ClientInfo, SessionId},
     user::{User, UserId},
     user_token::TokenPurpose,
 };
@@ -61,12 +62,14 @@ pub(crate) struct Proven {
 /// attached their own way in: so the password, linked provider accounts, passkeys, the
 /// authenticator app, recovery codes, the phone number, pending links and codes, and every
 /// session but `keep` are dropped. Only a [`Prover::Registrant`] keeps the password, being the one
-/// who chose it. Later proofs change nothing but the timestamp.
+/// who chose it. The first proof is recorded as `email_verified` from `client`; later proofs change
+/// nothing but the timestamp.
 pub(crate) async fn prove_email_ownership(
     store: &mut impl Store,
     user: UserId,
     now: OffsetDateTime,
     prover: Prover,
+    client: &ClientInfo,
 ) -> Result<Proven, AppError> {
     let before = store
         .find_user_for_update(user)
@@ -88,6 +91,14 @@ pub(crate) async fn prove_email_ownership(
         store.replace_recovery_codes(user, &[]).await?;
         store.set_user_phone(user, None).await?;
         let revoked = revoke_all(store, user, keep).await?;
+        store
+            .record_audit_event(&NewAuditEvent::new(
+                user,
+                AuditAction::EmailVerified,
+                client.clone(),
+                now,
+            ))
+            .await?;
         tracing::info!(user_id = %user, revoked, password_removed, "first proof of address ownership");
     }
     let user = store

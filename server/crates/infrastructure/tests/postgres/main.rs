@@ -3,6 +3,7 @@
     reason = "`clippy.toml` only exempts `#[test]` functions; the helpers here may unwrap too"
 )]
 
+mod audit;
 mod notes;
 mod outbox;
 mod pool;

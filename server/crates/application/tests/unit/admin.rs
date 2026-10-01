@@ -1,5 +1,5 @@
 use application::admin::dto::ListUsersQuery;
-use domain::user::UserId;
+use domain::{session::ClientInfo, user::UserId};
 
 use crate::support::Fixture;
 
@@ -249,7 +249,7 @@ async fn disabling_signs_the_user_out_and_enabling_restores_access() {
     assert!(
         fx.services
             .auth
-            .authenticate(&alice.token)
+            .authenticate(&alice.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()

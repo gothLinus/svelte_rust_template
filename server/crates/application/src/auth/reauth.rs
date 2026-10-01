@@ -11,8 +11,9 @@
 use std::sync::Arc;
 
 use domain::{
+    audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
-    database::Database,
+    database::{Database, Transaction},
     i18n::Message,
     mfa::{MfaRepository, TotpCredential},
     one_time_code::{CodeChannel, CodePurpose},
@@ -116,6 +117,11 @@ impl<A: Adapters> ReauthService<A> {
             .await?
             .ok_or(AppError::Unauthenticated)?;
         drop(conn);
+        let method = match &request {
+            ReauthenticateRequest::Password { .. } => AuthMethod::Password,
+            ReauthenticateRequest::Totp { .. } => AuthMethod::Totp,
+            ReauthenticateRequest::EmailCode { .. } => AuthMethod::EmailCode,
+        };
         match request {
             ReauthenticateRequest::Password { password } => {
                 self.check_password(&user, &password.0).await?;
@@ -135,7 +141,7 @@ impl<A: Adapters> ReauthService<A> {
                 .map_err(|_| AppError::invalid_code())?;
             }
         }
-        mark(&self.ctx, actor).await
+        mark(&self.ctx, actor, method).await
     }
 
     /// `Ok` if `password` is the user's. A user without a password never matches.
@@ -180,13 +186,22 @@ impl<A: Adapters> ReauthService<A> {
     }
 }
 
-pub(crate) async fn mark<A: Adapters>(ctx: &Context<A>, actor: &Actor) -> Result<(), AppError> {
+/// Marks the actor's session re-authenticated by `method`, and records it.
+pub(crate) async fn mark<A: Adapters>(
+    ctx: &Context<A>,
+    actor: &Actor,
+    method: AuthMethod<'_>,
+) -> Result<(), AppError> {
     let now = ctx.clock.now();
-    ctx.db
-        .connection()
-        .await?
-        .mark_session_reauthenticated(actor.session_id, now)
+    let mut tx = ctx.db.transaction().await?;
+    tx.mark_session_reauthenticated(actor.session_id, now)
         .await?;
+    tx.record_audit_event(
+        &ctx.actor_event(actor, AuditAction::Reauthenticated)
+            .detail(method.detail()),
+    )
+    .await?;
+    tx.commit().await?;
     tracing::info!(
         user_id = %actor.user_id,
         window_minutes = REAUTH_WINDOW.whole_minutes(),

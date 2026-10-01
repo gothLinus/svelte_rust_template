@@ -6,6 +6,7 @@
 //! to be copied. Several of them rely on one statement being atomic (`delete ... returning`, a
 //! guarded `update`) instead of read-then-write, so concurrent requests cannot both succeed.
 
+mod audit;
 mod identities;
 mod mfa;
 mod notes;

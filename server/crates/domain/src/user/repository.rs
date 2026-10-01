@@ -36,6 +36,12 @@ pub trait UserRepository: Send {
         id: UserId,
     ) -> impl Future<Output = Result<Option<User>, StorageError>> + Send;
 
+    /// The users among `ids` that exist, in no particular order.
+    fn find_users(
+        &mut self,
+        ids: &[UserId],
+    ) -> impl Future<Output = Result<Vec<User>, StorageError>> + Send;
+
     /// Like [`UserRepository::find_user`], but locks the row until the transaction ends, so a
     /// read-check-write sequence cannot interleave with another one.
     fn find_user_for_update(

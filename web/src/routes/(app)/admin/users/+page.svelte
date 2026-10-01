@@ -3,6 +3,7 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { api, errorMessage } from '$lib/api';
 	import { hasPermission, tabSync } from '$lib/auth';
@@ -28,6 +29,7 @@
 	let { data } = $props();
 
 	const canManage = $derived(hasPermission(data.me, Permission.USERS_MANAGE));
+	const canAudit = $derived(hasPermission(data.me, Permission.AUDIT_READ));
 	// svelte-ignore state_referenced_locally
 	let search = $state(data.search);
 	let busy = $state(false);
@@ -70,6 +72,12 @@
 					() => api.admin.grantRole(user.id, role),
 					(u) => t('admin-role-granted', { name: u.username, role })
 				);
+
+	function viewActivity(user: User) {
+		// The audit log filtered to the user: a resolved path with a query.
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		return goto(`${resolve('/admin/audit')}?user=${encodeURIComponent(user.id)}`);
+	}
 
 	const enable = (user: User) =>
 		change(
@@ -133,7 +141,7 @@
 					<span class="hidden w-28 shrink-0 text-sm text-muted-foreground md:block">
 						{formatDate(user.createdAt)}
 					</span>
-					{#if canManage}
+					{#if canManage || canAudit}
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger
 								class={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
@@ -143,16 +151,24 @@
 								<EllipsisIcon />
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content align="end" class="w-56">
-								<DropdownMenu.Label>{t('admin-menu-roles')}</DropdownMenu.Label>
-								{#each data.roles as role (role.name)}
-									<DropdownMenu.CheckboxItem
-										checked={user.roles.includes(role.name)}
-										onCheckedChange={() => toggleRole(user, role.name)}
-									>
-										<span class="capitalize">{role.name}</span>
-									</DropdownMenu.CheckboxItem>
-								{/each}
-								{#if !self}
+								{#if canAudit}
+									<DropdownMenu.Item onSelect={() => viewActivity(user)}>
+										{t('admin-view-activity')}
+									</DropdownMenu.Item>
+								{/if}
+								{#if canAudit && canManage}<DropdownMenu.Separator />{/if}
+								{#if canManage}
+									<DropdownMenu.Label>{t('admin-menu-roles')}</DropdownMenu.Label>
+									{#each data.roles as role (role.name)}
+										<DropdownMenu.CheckboxItem
+											checked={user.roles.includes(role.name)}
+											onCheckedChange={() => toggleRole(user, role.name)}
+										>
+											<span class="capitalize">{role.name}</span>
+										</DropdownMenu.CheckboxItem>
+									{/each}
+								{/if}
+								{#if canManage && !self}
 									<DropdownMenu.Separator />
 									<DropdownMenu.Item
 										variant={user.disabled ? 'default' : 'destructive'}

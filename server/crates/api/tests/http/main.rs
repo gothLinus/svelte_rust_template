@@ -12,6 +12,7 @@
 mod abuse;
 mod account;
 mod admin;
+mod audit;
 mod auth;
 mod errors;
 mod health;

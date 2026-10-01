@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use domain::{
+    audit::{AuditAction, AuditRepository},
     clock::Clock,
     database::{Database, Transaction},
     error::ValidationError,
@@ -62,6 +63,10 @@ impl<A: Adapters> AccountService<A> {
     ) -> Result<MeDto, AppError> {
         let change = ProfileChange::try_from(request)?;
         let mut tx = self.ctx.db.transaction().await?;
+        let previous = tx
+            .find_user_for_update(actor.user_id)
+            .await?
+            .ok_or(AppError::Unauthenticated)?;
         let user = match tx.set_user_username(actor.user_id, &change.username).await {
             Ok(user) => user.ok_or(AppError::Unauthenticated)?,
             Err(err) if err.is_unique_violation(USERNAME_UNIQUE_CONSTRAINT) => {
@@ -69,6 +74,15 @@ impl<A: Adapters> AccountService<A> {
             }
             Err(err) => return Err(err.into()),
         };
+        if previous.username() != user.username() {
+            tx.record_audit_event(
+                &self
+                    .ctx
+                    .actor_event(actor, AuditAction::UsernameChanged)
+                    .detail(user.username().as_str()),
+            )
+            .await?;
+        }
         let me = load_me(&mut tx, &user).await?;
         tx.commit().await?;
         Ok(me)
@@ -275,6 +289,13 @@ impl<A: Adapters> AccountService<A> {
             }
             Err(err) => return Err(err.into()),
         };
+        tx.record_audit_event(
+            &self
+                .ctx
+                .actor_event(actor, AuditAction::PhoneAdded)
+                .detail(phone.masked()),
+        )
+        .await?;
         let me = load_me(&mut tx, &user).await?;
         tx.commit().await?;
         tracing::info!(user_id = %actor.user_id, "phone number verified");
@@ -283,12 +304,24 @@ impl<A: Adapters> AccountService<A> {
 
     pub async fn remove_phone(&self, actor: &Actor) -> Result<MeDto, AppError> {
         actor.require_recent_authentication()?;
-        let mut conn = self.ctx.db.connection().await?;
-        let user = conn
+        let mut tx = self.ctx.db.transaction().await?;
+        let had_phone = tx
+            .find_user_for_update(actor.user_id)
+            .await?
+            .ok_or(AppError::Unauthenticated)?
+            .phone()
+            .is_some();
+        let user = tx
             .set_user_phone(actor.user_id, None)
             .await?
             .ok_or(AppError::Unauthenticated)?;
-        Ok(load_me(&mut conn, &user).await?)
+        if had_phone {
+            tx.record_audit_event(&self.ctx.actor_event(actor, AuditAction::PhoneRemoved))
+                .await?;
+        }
+        let me = load_me(&mut tx, &user).await?;
+        tx.commit().await?;
+        Ok(me)
     }
 
     pub async fn security(&self, actor: &Actor) -> Result<SecurityDto, AppError> {
@@ -418,6 +451,8 @@ impl<A: Adapters> AccountService<A> {
             json!(conn.count_recovery_codes(id).await?),
         );
 
+        export.add("security_activity", audit_events(&mut conn, id).await?);
+
         export
             .add_owned::<domain::note::Note>(&mut conn, id)
             .await?;
@@ -446,18 +481,14 @@ impl<A: Adapters> AccountService<A> {
     }
 
     pub async fn revoke_session(&self, actor: &Actor, id: SessionId) -> Result<(), AppError> {
-        let revoked = self
-            .ctx
-            .db
-            .connection()
-            .await?
-            .delete_user_session(actor.user_id, id)
-            .await?;
-        if revoked {
-            Ok(())
-        } else {
-            Err(AppError::NotFound)
+        let mut tx = self.ctx.db.transaction().await?;
+        if !tx.delete_user_session(actor.user_id, id).await? {
+            return Err(AppError::NotFound);
         }
+        tx.record_audit_event(&self.ctx.actor_event(actor, AuditAction::SessionRevoked))
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     /// Deletes the account and everything it owns, and refuses if it would leave nobody able to
@@ -519,6 +550,47 @@ impl<A: Adapters> AccountService<A> {
 
         tracing::info!(user_id = %user.id(), "account deleted");
         Ok(())
+    }
+}
+
+/// Every audit event about `user`, newest first, for the export.
+async fn audit_events(
+    store: &mut impl AuditRepository,
+    user: domain::user::UserId,
+) -> Result<serde_json::Value, AppError> {
+    use domain::{
+        audit::AuditFilter,
+        pagination::{MAX_PAGE_SIZE, PageRequest, PageSize},
+    };
+    use serde_json::json;
+
+    use crate::export::timestamp;
+
+    let filter = AuditFilter {
+        user_id: Some(user),
+    };
+    let size =
+        PageSize::parse(Some(MAX_PAGE_SIZE)).map_err(|err| AppError::invalid("limit", &err))?;
+    let mut events = Vec::new();
+    let mut after = None;
+    loop {
+        let page = store
+            .list_audit_events(&filter, PageRequest::new(size, after.take()))
+            .await?;
+        events.extend(page.items.iter().map(|event| {
+            json!({
+                "action": event.action.as_str(),
+                "detail": event.detail,
+                "by_someone_else": event.actor_id.is_some_and(|actor| actor != event.user_id),
+                "ip": event.client.ip.map(|ip| ip.to_string()),
+                "user_agent": event.client.user_agent,
+                "occurred_at": timestamp(event.occurred_at),
+            })
+        }));
+        match page.next {
+            Some(next) => after = Some(next),
+            None => return Ok(serde_json::Value::Array(events)),
+        }
     }
 }
 

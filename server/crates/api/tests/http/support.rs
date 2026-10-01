@@ -163,6 +163,7 @@ impl TestApp {
                 tokens: TokenPolicy::default(),
                 require_email_verification: options.require_email_verification,
                 unverified_account_ttl: None,
+                audit_retention: None,
                 links: Links::new(ORIGIN),
                 text_countries: Vec::new(),
                 locale: Locale::EN,
