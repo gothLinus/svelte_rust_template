@@ -57,6 +57,11 @@ theme-system = System
 theme-label = Theme
 theme-button = Theme: { $mode }
 
+## Language
+
+# Name of the language menu. Each language is listed by its own name (English, Deutsch).
+language-label = Language
+
 ## Site
 
 # The tagline of the app, used as the landing page's introduction.

@@ -22,7 +22,7 @@ use domain::{
     audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
-    i18n::Message,
+    i18n::{Locale, Message},
     rbac::RbacRepository,
     secret::Secret,
     security::{PasswordHasher, TokenGenerator},
@@ -94,10 +94,14 @@ impl<A: Adapters> AuthService<A> {
     /// A taken address is `409 email_taken` when sign-in needs no verified address, a deliberate
     /// trade-off: the user learns it at once and can sign in instead. With verification required it
     /// is answered like a new address, and its owner gets a "you already have an account" mail.
+    ///
+    /// `locale` is the language the request asked for; mail to the account is written in it until
+    /// the user picks another.
     pub async fn register(
         &self,
         request: RegisterRequest,
         client: ClientInfo,
+        locale: Option<Locale>,
     ) -> Result<Registered, AppError> {
         let registration = Registration::try_from(request)?;
         let password_hash = self
@@ -114,6 +118,7 @@ impl<A: Adapters> AuthService<A> {
             username: registration.username,
             password_hash: Some(password_hash),
             email_verified_at: None,
+            locale,
         };
         let user = match tx.create_user(&new_user).await {
             Ok(user) => user,
@@ -125,12 +130,7 @@ impl<A: Adapters> AuthService<A> {
                     && self.ctx.settings.require_email_verification =>
             {
                 drop(tx);
-                let forgot = self.ctx.settings.links.forgot_password();
-                mail::send(
-                    &*self.ctx.mailer,
-                    mail::already_registered(&self.ctx.voice(), new_user.email.clone(), &forgot),
-                )
-                .await;
+                self.send_already_registered(&new_user.email).await?;
                 return Ok(Registered::VerificationPending {
                     pending: VerificationPending {
                         email: new_user.email.to_string(),
@@ -184,8 +184,7 @@ impl<A: Adapters> AuthService<A> {
             Registered::SignedIn(Box::new(signed_in))
         };
 
-        self.send_verification(user.email().clone(), &verification)
-            .await;
+        self.send_verification(&user, &verification).await;
         tracing::info!(user_id = %user.id(), "account registered");
         Ok(outcome)
     }
@@ -499,7 +498,7 @@ impl<A: Adapters> AuthService<A> {
         )
         .await?;
         drop(conn);
-        self.send_verification(user.email().clone(), &token).await;
+        self.send_verification(&user, &token).await;
         Ok(())
     }
 
@@ -545,7 +544,7 @@ impl<A: Adapters> AuthService<A> {
         let ttl = self.ctx.settings.tokens.password_reset_ttl;
         mail::send(
             &*self.ctx.mailer,
-            mail::password_reset(&self.ctx.voice(), user.email().clone(), &link, ttl),
+            mail::password_reset(&self.ctx.voice_for(user), user.email().clone(), &link, ttl),
         )
         .await;
         tracing::info!(user_id = %user.id(), "password reset link sent");
@@ -612,7 +611,7 @@ impl<A: Adapters> AuthService<A> {
         let forgot = self.ctx.settings.links.forgot_password();
         mail::send(
             &*self.ctx.mailer,
-            mail::password_changed(&self.ctx.voice(), user.email().clone(), &forgot),
+            mail::password_changed(&self.ctx.voice_for(&user), user.email().clone(), &forgot),
         )
         .await;
         tracing::info!(%user_id, "password reset");
@@ -679,9 +678,10 @@ impl<A: Adapters> AuthService<A> {
         .await?;
         tx.commit().await?;
 
+        // To the address it had before, in the language it has.
         mail::notify(
             &self.ctx,
-            previous.email().clone(),
+            &previous,
             Message::new("notice-email-changed").arg("email", new_email.masked()),
         )
         .await;
@@ -743,7 +743,7 @@ impl<A: Adapters> AuthService<A> {
         let forgot = self.ctx.settings.links.forgot_password();
         mail::send(
             &*self.ctx.mailer,
-            mail::email_change_cancelled(&self.ctx.voice(), old_email, &forgot),
+            mail::email_change_cancelled(&self.ctx.voice_for(&user), old_email, &forgot),
         )
         .await;
         tracing::info!(user_id = %user.id(), "email change cancelled");
@@ -767,14 +767,35 @@ impl<A: Adapters> AuthService<A> {
             .map(|session| session.id()))
     }
 
-    async fn send_verification(&self, to: Email, token: &Secret) {
+    async fn send_verification(&self, user: &User, token: &Secret) {
         let link = self.ctx.settings.links.verify_email(token);
         let ttl = self.ctx.settings.tokens.email_verification_ttl;
         mail::send(
             &*self.ctx.mailer,
-            mail::verify_email(&self.ctx.voice(), to, &link, ttl),
+            mail::verify_email(&self.ctx.voice_for(user), user.email().clone(), &link, ttl),
         )
         .await;
+    }
+
+    /// Tells the owner of `email` that someone tried to register it again, in their language.
+    async fn send_already_registered(&self, email: &Email) -> Result<(), AppError> {
+        let owner = self
+            .ctx
+            .db
+            .connection()
+            .await?
+            .find_user_by_email(email)
+            .await?;
+        let voice = owner
+            .as_ref()
+            .map_or_else(|| self.ctx.voice(), |owner| self.ctx.voice_for(owner));
+        let forgot = self.ctx.settings.links.forgot_password();
+        mail::send(
+            &*self.ctx.mailer,
+            mail::already_registered(&voice, email.clone(), &forgot),
+        )
+        .await;
+        Ok(())
     }
 }
 

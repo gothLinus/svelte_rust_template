@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            select id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, created_at, updated_at\n            from users\n            where id = $1\n            ",
+  "query": "\n            update users set phone = $2, phone_verified_at = $3\n            where id = $1\n            returning id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, locale, created_at, updated_at\n            ",
   "describe": {
     "columns": [
       {
@@ -93,6 +93,17 @@
       },
       {
         "ordinal": 8,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -116,7 +127,9 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Uuid",
+        "Text",
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -128,9 +141,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "39408ab99cf059d34955823d18b98e653bbb9cc83b49fd1c9ecb94a9eb1da220"
+  "hash": "15e1b1f9bbf40ddf302de558f0f861c6c2627d35e424aaf124dc53860f1c87f3"
 }

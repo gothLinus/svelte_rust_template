@@ -182,6 +182,7 @@ pub fn user_parts(user: &User) -> UserParts {
         password_hash: user.password_hash().cloned(),
         email_verified_at: user.email_verified_at(),
         disabled_at: user.disabled_at(),
+        locale: user.locale().cloned(),
         created_at: user.created_at(),
         updated_at: user.updated_at(),
     }
@@ -251,6 +252,7 @@ impl UserRepository for Mem {
                 password_hash: new.password_hash.clone(),
                 email_verified_at: new.email_verified_at,
                 disabled_at: None,
+                locale: new.locale.clone(),
                 created_at: START,
                 updated_at: START,
             });
@@ -330,6 +332,18 @@ impl UserRepository for Mem {
                 &request,
                 |user| user.id().as_uuid(),
             ))
+        })
+    }
+
+    async fn set_user_locale(
+        &mut self,
+        id: UserId,
+        locale: Option<&domain::i18n::Locale>,
+    ) -> Result<Option<User>, StorageError> {
+        self.with(|state| {
+            Ok(update_user(state, id, |user| {
+                user.locale = locale.cloned();
+            }))
         })
     }
 

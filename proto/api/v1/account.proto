@@ -13,6 +13,12 @@ message UpdateProfileRequest {
   string username = 1;
 }
 
+// `PUT /me/locale`: the language for mail and texts, one the app is available in. Absent
+// leaves it to the server's default.
+message SetLocaleRequest {
+  optional string locale = 1;
+}
+
 message ChangeEmailRequest {
   string email = 1;
 }

@@ -91,6 +91,8 @@ pub struct UserDto {
     pub has_password: bool,
     pub disabled: bool,
     pub roles: Vec<String>,
+    /// The language chosen for mail and texts, if any.
+    pub locale: Option<String>,
     pub created_at: OffsetDateTime,
 }
 
@@ -106,6 +108,7 @@ impl UserDto {
             has_password: user.has_password(),
             disabled: user.is_disabled(),
             roles: roles.iter().map(ToString::to_string).collect(),
+            locale: user.locale().map(ToString::to_string),
             created_at: user.created_at(),
         }
     }

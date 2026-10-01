@@ -104,11 +104,8 @@ pub(crate) async fn send(mailer: &dyn Mailer, mail: Mail) {
     }
 }
 
-/// Says things in one language: renders messages for mail and texts.
-///
-/// Users have no language setting yet, so this is always
-/// [`Settings::locale`](crate::Settings::locale); when accounts get one, the use cases pick the
-/// recipient's locale here and nothing else changes.
+/// Says things in one language: renders messages for mail and texts, in the recipient's language
+/// (`Context::voice_for`) or the default one (`Context::voice`).
 pub(crate) struct Voice<'a> {
     translator: &'a dyn Translator,
     locale: &'a Locale,
@@ -124,11 +121,16 @@ impl<'a> Voice<'a> {
     }
 }
 
-pub(crate) async fn notify<A: crate::Adapters>(ctx: &crate::Context<A>, to: Email, what: Message) {
+/// Mails `user` a security notice about `what`, at their current address.
+pub(crate) async fn notify<A: crate::Adapters>(
+    ctx: &crate::Context<A>,
+    user: &domain::user::User,
+    what: Message,
+) {
     let link = ctx.settings.links.security_settings();
     send(
         &*ctx.mailer,
-        security_notice(&ctx.voice(), to, &what, &link),
+        security_notice(&ctx.voice_for(user), user.email().clone(), &what, &link),
     )
     .await;
 }

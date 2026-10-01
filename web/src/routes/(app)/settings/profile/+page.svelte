@@ -9,6 +9,7 @@
 	import PageHeading from '$lib/components/page-heading.svelte';
 	import DataCard from '$lib/components/profile/data-card.svelte';
 	import EmailCard from '$lib/components/profile/email-card.svelte';
+	import LanguageCard from '$lib/components/profile/language-card.svelte';
 	import PhoneCard from '$lib/components/profile/phone-card.svelte';
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -111,6 +112,7 @@
 	</form>
 </Card.Root>
 
+<LanguageCard />
 <EmailCard email={data.me.user.email} verified={data.me.user.emailVerified} />
 <PhoneCard user={data.me.user} channels={data.methods.textChannels} />
 <DataCard />

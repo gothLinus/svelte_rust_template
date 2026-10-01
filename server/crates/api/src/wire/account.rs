@@ -1,7 +1,7 @@
 use application::{
     ValidationErrors,
     account::dto::{
-        AddPhoneRequest, ChangeEmailRequest, DeleteAccountRequest, SecurityDto,
+        AddPhoneRequest, ChangeEmailRequest, DeleteAccountRequest, SecurityDto, SetLocaleRequest,
         UpdateProfileRequest,
     },
     dto::SecretInput,
@@ -16,6 +16,16 @@ impl FromMessage for UpdateProfileRequest {
     fn from_message(message: v1::UpdateProfileRequest) -> Result<Self, ValidationErrors> {
         Ok(Self {
             username: message.username,
+        })
+    }
+}
+
+impl FromMessage for SetLocaleRequest {
+    type Message = v1::SetLocaleRequest;
+
+    fn from_message(message: v1::SetLocaleRequest) -> Result<Self, ValidationErrors> {
+        Ok(Self {
+            locale: message.locale,
         })
     }
 }

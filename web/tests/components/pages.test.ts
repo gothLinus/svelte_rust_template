@@ -54,6 +54,18 @@ const children = createRawSnippet(() => ({ render: () => '<p>Page content</p>' }
 beforeEach(() => session.connect(() => null));
 
 describe('root layout', () => {
+	afterEach(async () => {
+		await i18n.use('en');
+	});
+
+	it('follows the language of the signed-in account', async () => {
+		const german = me([], undefined, { locale: 'de' });
+		session.connect(() => german);
+		render(RootLayout, { data: rootData(german), children });
+
+		await vi.waitFor(() => expect(i18n.locale).toBe('de'));
+	});
+
 	it('offers a retry when the session could not be checked', () => {
 		render(RootLayout, { data: { ...rootData(), sessionError: 'The server is down.' }, children });
 		expect(screen.getByText('The server is down.')).toBeInTheDocument();
@@ -180,7 +192,8 @@ describe('admin users', () => {
 				}),
 				roles: [
 					create(RoleSchema, { name: 'user', description: 'Everyone' }),
-					create(RoleSchema, { name: 'admin', description: 'Everything' })
+					create(RoleSchema, { name: 'admin', description: 'Everything' }),
+					create(RoleSchema, { name: 'auditor' })
 				],
 				search: '',
 				after: null
@@ -237,6 +250,17 @@ describe('admin users', () => {
 
 		await user.click(screen.getByRole('button', { name: t('pagination-next') }));
 		expect(navigation.goto).toHaveBeenLastCalledWith('/admin/users?after=c1', expect.anything());
+	});
+
+	it('describes each role without making the description its name', async () => {
+		renderUsers();
+		await openMenu(t('admin-manage-label', { name: 'bob' }));
+
+		const admin = await screen.findByRole('menuitemcheckbox', { name: 'admin' });
+		expect(admin).toHaveAccessibleDescription('Everything');
+		expect(screen.getByRole('menuitemcheckbox', { name: 'auditor' })).not.toHaveAttribute(
+			'aria-describedby'
+		);
 	});
 
 	it('shows failures', async () => {

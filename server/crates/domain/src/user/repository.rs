@@ -4,6 +4,7 @@ use time::OffsetDateTime;
 
 use crate::{
     error::StorageError,
+    i18n::Locale,
     pagination::{Page, PageRequest},
     user::{Email, NewUser, PasswordHash, PhoneNumber, User, UserFilter, UserId, Username},
 };
@@ -93,6 +94,14 @@ pub trait UserRepository: Send {
         &mut self,
         id: UserId,
         phone: Option<(&PhoneNumber, OffsetDateTime)>,
+    ) -> impl Future<Output = Result<Option<User>, StorageError>> + Send;
+
+    /// Sets the language mail and texts are written in, or with `None` leaves it to the server's
+    /// default.
+    fn set_user_locale(
+        &mut self,
+        id: UserId,
+        locale: Option<&Locale>,
     ) -> impl Future<Output = Result<Option<User>, StorageError>> + Send;
 
     fn set_user_password(

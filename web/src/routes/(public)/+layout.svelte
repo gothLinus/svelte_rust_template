@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import Logo from '$lib/components/logo.svelte';
+	import LanguageMenu from '$lib/components/language-menu.svelte';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 
 	let { children } = $props();
@@ -11,7 +12,10 @@
 		<a href={resolve('/')} class="rounded-xl">
 			<Logo />
 		</a>
-		<ThemeToggle />
+		<div class="flex items-center gap-1">
+			<LanguageMenu />
+			<ThemeToggle />
+		</div>
 	</header>
 	<main
 		class="flex flex-1 items-start justify-center px-4 pt-2 pb-[calc(--spacing(10)+env(safe-area-inset-bottom))] sm:items-center sm:pt-0 sm:pb-16"

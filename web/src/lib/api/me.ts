@@ -20,6 +20,7 @@ import {
 	SecondFactorAddedSchema,
 	SecurityOverviewSchema,
 	SessionListSchema,
+	SetLocaleRequestSchema,
 	TotpSetupSchema,
 	UpdateProfileRequestSchema,
 	type Me,
@@ -63,6 +64,9 @@ export function meApi(client: ApiClient) {
 		},
 		updateProfile: (body: Init<typeof UpdateProfileRequestSchema>) =>
 			client.patch('/me', { body: encode(UpdateProfileRequestSchema, body), response: me }),
+		/** The language of the app and of mail and texts; none leaves it to the server. */
+		setLocale: (locale?: string) =>
+			client.put('/me/locale', { body: encode(SetLocaleRequestSchema, { locale }), response: me }),
 		changeEmail: (body: Init<typeof ChangeEmailRequestSchema>) =>
 			client.post('/me/email', { body: encode(ChangeEmailRequestSchema, body) }),
 		requestPasswordChange: () => client.post('/me/password'),

@@ -89,7 +89,7 @@ impl<A: Adapters> ReauthService<A> {
         mail::send(
             &*self.ctx.mailer,
             mail::reauthentication_code(
-                &self.ctx.voice(),
+                &self.ctx.voice_for(&user),
                 user.email().clone(),
                 &group(code.expose()),
             ),

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            update users set email_verified_at = coalesce(email_verified_at, $2)\n            where id = $1\n            returning id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, created_at, updated_at\n            ",
+  "query": "\n            update users set locale = $2\n            where id = $1\n            returning id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, locale, created_at, updated_at\n            ",
   "describe": {
     "columns": [
       {
@@ -93,6 +93,17 @@
       },
       {
         "ordinal": 8,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -117,7 +128,7 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Timestamptz"
+        "Text"
       ]
     },
     "nullable": [
@@ -129,9 +140,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "f5abe2d9e75b82b621de8504113af3cc20fe94253e59f815423f574dfa444b1f"
+  "hash": "8c7eb4815dc4f381f49913014852cb6fa7c15fdf7ecfed472dec7210c091d5d9"
 }

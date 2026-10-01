@@ -123,7 +123,12 @@ async fn get_user_and_list_roles() {
         .unwrap_err();
     assert_eq!(err.code(), "not_found");
 
-    let roles = fx.services.admin.list_roles(&admin.actor).await.unwrap();
+    let roles = fx
+        .services
+        .admin
+        .list_roles(&admin.actor, &domain::i18n::Locale::EN)
+        .await
+        .unwrap();
     let names: Vec<&str> = roles.iter().map(|r| r.name.as_str()).collect();
     assert_eq!(names, ["admin", "user"]);
 }

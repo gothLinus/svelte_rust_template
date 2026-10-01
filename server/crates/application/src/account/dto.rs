@@ -27,6 +27,12 @@ impl TryFrom<UpdateProfileRequest> for ProfileChange {
     }
 }
 
+/// The language for mail and texts: one the catalog has, or `None` for the server's default.
+#[derive(Debug)]
+pub struct SetLocaleRequest {
+    pub locale: Option<String>,
+}
+
 #[derive(Debug)]
 pub struct ChangeEmailRequest {
     pub email: String,

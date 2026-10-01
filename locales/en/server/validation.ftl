@@ -20,6 +20,11 @@ validation-phone-country-unsupported = numbers from this country are not support
 # unchanged
 validation-email-unchanged = this is your current address
 
+## Languages.
+
+# unsupported_locale
+validation-locale-unsupported = not a language this app is available in
+
 ## Usernames. { $min } and { $max } are numbers of characters.
 
 # too_short

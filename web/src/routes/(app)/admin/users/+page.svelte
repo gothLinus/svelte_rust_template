@@ -160,11 +160,27 @@
 								{#if canManage}
 									<DropdownMenu.Label>{t('admin-menu-roles')}</DropdownMenu.Label>
 									{#each data.roles as role (role.name)}
+										{@const described = role.description
+											? `role-${role.name}-description`
+											: undefined}
 										<DropdownMenu.CheckboxItem
 											checked={user.roles.includes(role.name)}
 											onCheckedChange={() => toggleRole(user, role.name)}
+											aria-describedby={described}
 										>
-											<span class="capitalize">{role.name}</span>
+											<span class="flex min-w-0 flex-col">
+												<span class="capitalize">{role.name}</span>
+												{#if described}
+													<!-- A description, not part of the item's name. -->
+													<span
+														id={described}
+														aria-hidden="true"
+														class="text-xs font-normal whitespace-normal text-muted-foreground"
+													>
+														{role.description}
+													</span>
+												{/if}
+											</span>
 										</DropdownMenu.CheckboxItem>
 									{/each}
 								{/if}

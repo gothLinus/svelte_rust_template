@@ -38,7 +38,7 @@ use axum_extra::extract::CookieJar;
 use domain::user::{Email, UserId};
 
 use crate::{
-    extract::{Client, CurrentUser, Proto},
+    extract::{Client, CurrentUser, Language, Proto},
     problem::ApiError,
     rate_limit::{Action, account_key, user_key},
     state::AppState,
@@ -106,6 +106,7 @@ fn signed_in_cookies<A: Adapters>(
 async fn register<A: Adapters>(
     State(state): State<AppState<A>>,
     client: Client,
+    Language(locale): Language,
     jar: CookieJar,
     Proto(body): Proto<RegisterRequest>,
 ) -> Result<Response, ApiError> {
@@ -117,7 +118,7 @@ async fn register<A: Adapters>(
         .check_account(Action::SendCode, &body.email)
         .await?;
 
-    match state.services.auth.register(body, client.0).await? {
+    match state.services.auth.register(body, client.0, locale).await? {
         Registered::SignedIn(signed_in) => {
             let jar = signed_in_cookies(&state, jar, &signed_in);
             Ok((StatusCode::CREATED, jar, Proto(signed_in.me)).into_response())

@@ -12,9 +12,11 @@ pub use auth::{
     Authentication, CurrentUser, OptionalUser, PermissionMarker, RequirePermission, permission,
 };
 pub use client::{Client, client_ip};
+pub use language::Language;
 
 mod auth;
 mod client;
+mod language;
 
 #[derive(Debug, FromRequestParts)]
 #[from_request(via(axum::extract::Query), rejection(ApiError))]
