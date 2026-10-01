@@ -61,6 +61,17 @@ export function initials(name: string): string {
 	return letters.map((part) => [...part][0]?.toUpperCase() ?? '').join('') || '?';
 }
 
+/**
+ * A server message as a sentence of its own: capitalised and ending in a full stop. Problem
+ * details are fragments ("this link is invalid or has expired") meant to follow a field name.
+ */
+export function asSentence(text: string): string {
+	const trimmed = text.trim();
+	if (!trimmed) return trimmed;
+	const capitalised = trimmed.charAt(0).toLocaleUpperCase(i18n.locale) + trimmed.slice(1);
+	return /[.!?…]$/.test(capitalised) ? capitalised : `${capitalised}.`;
+}
+
 export function excerpt(text: string, max = 140): string {
 	const line = text.trim().split('\n')[0] ?? '';
 	const chars = [...line];

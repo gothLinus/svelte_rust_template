@@ -56,7 +56,7 @@ impl SessionPolicy {
     }
 }
 
-/// Where a request came from, recorded on the session so users can recognise their devices in the
+/// Where a request came from, recorded on the session so users can recognize their devices in the
 /// session list.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ClientInfo {

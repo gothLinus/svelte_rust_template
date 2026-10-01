@@ -107,3 +107,18 @@ fn lists_ids_and_variables_for_parity_checks() {
     assert_eq!(catalog.variables(&Locale::EN, "items"), ["count"]);
     assert!(catalog.variables(&Locale::EN, "only-en").is_empty());
 }
+
+#[test]
+fn length_limits_agree_with_their_number() {
+    let catalog = Catalog::embedded().unwrap();
+    let say = |id, name, value: i64| catalog.text(&Message::new(id).arg(name, value));
+
+    assert_eq!(
+        say("validation-password-too-short", "min", 1),
+        "must be at least 1 character"
+    );
+    assert_eq!(
+        say("note-title-too-long", "max", 200),
+        "must be at most 200 characters"
+    );
+}

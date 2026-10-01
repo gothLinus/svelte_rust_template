@@ -47,7 +47,7 @@ pagination-next = Next
 
 ## Theme
 
-# Menu entries for the colour scheme.
+# Menu entries for the color scheme.
 theme-light = Light
 theme-dark = Dark
 theme-system = System

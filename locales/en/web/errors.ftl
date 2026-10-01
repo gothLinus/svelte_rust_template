@@ -20,4 +20,4 @@ error-forbidden = You do not have permission to see this page.
 
 # A field the form has no input for was rejected by the server.
 # { $field } is the field's name, e.g. "New password"; { $message } completes the sentence.
-form-field-problem = { $field } { $message }.
+form-field-problem = { $field }: { $message }.

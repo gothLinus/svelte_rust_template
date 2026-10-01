@@ -28,9 +28,15 @@ validation-locale-unsupported = not a language this app is available in
 ## Usernames. { $min } and { $max } are numbers of characters.
 
 # too_short
-validation-username-too-short = must be at least { $min } characters
+validation-username-too-short = must be at least { $min ->
+        [one] { $min } character
+       *[other] { $min } characters
+    }
 # too_long
-validation-username-too-long = must be at most { $max } characters
+validation-username-too-long = must be at most { $max ->
+        [one] { $max } character
+       *[other] { $max } characters
+    }
 # invalid_username
 validation-username-invalid-characters = use letters, digits, dots, dashes and underscores, starting with a letter or digit
 # invalid_username
@@ -41,9 +47,15 @@ validation-username-taken = this username is taken
 ## Passwords. { $min } and { $max } are numbers of characters.
 
 # too_short
-validation-password-too-short = must be at least { $min } characters
+validation-password-too-short = must be at least { $min ->
+        [one] { $min } character
+       *[other] { $min } characters
+    }
 # too_long
-validation-password-too-long = must be at most { $max } characters
+validation-password-too-long = must be at most { $max ->
+        [one] { $max } character
+       *[other] { $max } characters
+    }
 # too_weak
 validation-password-only-spaces = must not consist of spaces only
 # too_common
@@ -61,7 +73,10 @@ validation-invalid-code = this code is invalid or has expired
 ## Passkeys. { $max } is a number of characters.
 
 # too_long
-validation-passkey-name-too-long = must be at most { $max } characters
+validation-passkey-name-too-long = must be at most { $max ->
+        [one] { $max } character
+       *[other] { $max } characters
+    }
 # invalid_characters
 validation-passkey-name-control-characters = must not contain control characters
 
@@ -72,9 +87,15 @@ validation-page-size-out-of-range = must be between { $min } and { $max }
 # invalid_cursor
 validation-invalid-cursor = not a valid page cursor
 # too_long. { $max } is a number of characters.
-validation-search-too-long = must be at most { $max } characters
+validation-search-too-long = must be at most { $max ->
+        [one] { $max } character
+       *[other] { $max } characters
+    }
 # too_short. { $min } is a number of characters.
-validation-search-too-short = must be at least { $min } characters
+validation-search-too-short = must be at least { $min ->
+        [one] { $min } character
+       *[other] { $min } characters
+    }
 
 ## Values of the API that no person types; they show up when a client sends nonsense.
 

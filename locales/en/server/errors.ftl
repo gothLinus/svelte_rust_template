@@ -58,7 +58,7 @@ conflict-oauth-cancelled = signing in with the provider was cancelled
 # email_required
 conflict-oauth-email-required = the provider did not share an email address
 # email_unverified
-conflict-oauth-email-unverified = { $provider } did not confirm this email address; register with it first, then link { $provider } in your security settings
+conflict-oauth-email-unverified = { $provider } did not confirm this email address; register with this address first, then link { $provider } in your security settings
 # email_in_use
 conflict-oauth-email-in-use = an account with this email already exists; sign in to it and link { $provider } in your security settings
 # username_taken
