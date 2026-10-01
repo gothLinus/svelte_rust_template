@@ -7,6 +7,7 @@ types := "web/src/lib/types/generated"
 image := env("IMAGE_NAME", "svelte-rust-template")
 opener := if os() == "macos" { "open" } else { "xdg-open" }
 mailpit_url := "http://localhost:" + env("MAILPIT_UI_PORT", "8025")
+rustfs_console_url := "http://localhost:" + env("RUSTFS_CONSOLE_PORT", "9001")
 coverage_ignore := "(/tests/|src/main\\.rs|src/bin/)"
 
 alias d := dev
@@ -16,21 +17,23 @@ alias f := fmt
 default:
     @{{ just }} --list --unsorted
 
-# First run: check tools, create .env, start Postgres and Mailpit, migrate, install web deps
+# First run: check tools, create .env, start Postgres, RustFS and Mailpit, migrate, install web deps
 [group('setup')]
 setup: doctor env
     {{ just }} db-up migrate
     cd web && bun install
 
-# Copy .env.example to .env with a generated SECRET_KEY, unless .env exists
+# Copy .env.example to .env with generated SECRET_KEY and STORAGE_SECRET_KEY, unless .env exists
 [group('setup')]
 env:
     #!/usr/bin/env bash
     set -euo pipefail
     test -f .env && exit 0
     key="$(openssl rand -base64 32)"
-    sed "s|^SECRET_KEY=.*|SECRET_KEY=${key}|" .env.example > .env
-    echo "Created .env from .env.example with a new SECRET_KEY"
+    storage_key="$(openssl rand -hex 20)"
+    sed -e "s|^SECRET_KEY=.*|SECRET_KEY=${key}|" \
+        -e "s|^STORAGE_SECRET_KEY=.*|STORAGE_SECRET_KEY=${storage_key}|" .env.example > .env
+    echo "Created .env from .env.example with a new SECRET_KEY and STORAGE_SECRET_KEY"
 
 # Check that every tool the recipes need is installed and Docker is running
 [group('setup')]
@@ -70,7 +73,7 @@ tools:
     cargo install --locked cargo-llvm-cov cargo-deny cargo-machete
     cd server && rustup component add llvm-tools-preview
 
-# Start the database, then the API and the Vite dev server together (Ctrl-C stops both)
+# Start the database and RustFS, then the API and the Vite dev server together (Ctrl-C stops both)
 [group('dev')]
 dev: db-up
     #!/usr/bin/env bash
@@ -104,18 +107,23 @@ create-admin email: db-up
 mail:
     {{ opener }} {{ mailpit_url }}
 
-# Start Postgres and Mailpit and wait until they are healthy
+# Open the RustFS console, where uploaded files are stored
+[group('dev')]
+storage:
+    {{ opener }} {{ rustfs_console_url }}
+
+# Start Postgres, RustFS and Mailpit and wait until they are healthy
 [group('db')]
 db-up: env
-    @docker compose --profile mail --progress quiet up -d --wait postgres mailpit
+    @docker compose --profile mail --progress quiet up -d --wait postgres rustfs mailpit
 
 # Stop the containers, keeping their data
 [group('db')]
 db-down:
     docker compose --profile mail --profile prod down
 
-# Drop all data and start from a freshly migrated database
-[confirm("This deletes every row in the local database. Continue? [y/N]")]
+# Drop all data, stored files included, and start from a freshly migrated database
+[confirm("This deletes every row in the local database and every stored file. Continue? [y/N]")]
 [group('db')]
 db-reset:
     docker compose --profile mail --profile prod down --volumes
@@ -284,6 +292,9 @@ smoke: docker-build db-up
     cid="$(docker run -d --network "$network" -p "127.0.0.1:$port:3000" \
         -e DATABASE_URL="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$db" \
         -e APP_URL="$base" -e MAIL_TRANSPORT=log -e MAIL_FROM="Smoke <smoke@example.com>" \
+        -e STORAGE_ENDPOINT=http://rustfs:9000 -e STORAGE_BUCKET=smoke \
+        -e STORAGE_ACCESS_KEY="${STORAGE_ACCESS_KEY:-rustfsadmin}" \
+        -e STORAGE_SECRET_KEY="${STORAGE_SECRET_KEY:-rustfsadmin}" \
         -e SECRET_KEY="$(openssl rand -base64 32)" {{ image }}:latest)"
     fail() { echo "smoke: $1" >&2; docker logs "$cid" | tail -20 >&2; exit 1; }
     for _ in $(seq 60); do
@@ -305,7 +316,11 @@ smoke: docker-build db-up
     [ "$code" = 201 ] || fail "registering answered $code, not 201"
     code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar" "$base/api/v1/me")"
     [ "$code" = 200 ] || fail "the new session answered $code on /me"
-    echo "smoke: the image boots, serves the SPA with its headers, refuses CSRF and signs up"
+    code="$(curl -s -o /dev/null -w '%{http_code}' -b "$work/jar" -H 'Content-Type: text/plain' \
+        -H 'X-Requested-With: fetch' -H "Origin: $base" --data-binary 'smoke' \
+        "$base/api/v1/files?name=smoke.txt")"
+    [ "$code" = 201 ] || fail "uploading a file answered $code, not 201"
+    echo "smoke: the image boots, serves the SPA with its headers, refuses CSRF, signs up and stores a file"
 
 # Build the SPA into web/build and a release binary into server/target/release/api
 [group('build')]
@@ -324,7 +339,7 @@ serve: build db-up
 docker-build:
     docker build -t {{ image }}:latest .
 
-# Run the production image with Postgres and Mailpit on http://localhost:$APP_PORT: just up -d
+# Run the production image with Postgres, RustFS and Mailpit on http://localhost:$APP_PORT: just up -d
 [group('build')]
 up *args:
     docker compose --profile prod up --build {{ args }}

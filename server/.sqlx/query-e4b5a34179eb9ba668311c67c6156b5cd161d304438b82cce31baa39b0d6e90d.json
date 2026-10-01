@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into object_deletions (object_key, due_at)\n            values ($1, $2)\n            on conflict (object_key) do update set due_at = excluded.due_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e4b5a34179eb9ba668311c67c6156b5cd161d304438b82cce31baa39b0d6e90d"
+}

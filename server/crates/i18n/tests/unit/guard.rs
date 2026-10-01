@@ -109,6 +109,8 @@ fn chained_args(text: &str, at: usize) -> Vec<String> {
             return names;
         }
         let start = at + skipped + ".arg(".len();
+        // rustfmt moves the arguments to lines of their own when they are long.
+        let start = start + text[start..].len() - text[start..].trim_start().len();
         let Some((name, _)) = literal_at(text, start) else {
             return names;
         };

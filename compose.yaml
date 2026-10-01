@@ -1,4 +1,4 @@
-# Local services; the `prod` profile adds the production image.
+# Local services (Postgres, RustFS, Mailpit); the `prod` profile adds the production image.
 
 # Fixed so every checkout shares one database container; set COMPOSE_PROJECT_NAME in
 # .env (and other ports) to give a checkout its own.
@@ -21,6 +21,28 @@ services:
       interval: 2s
       timeout: 5s
       retries: 15
+    restart: unless-stopped
+
+  # S3-compatible object store for file contents. The console on RUSTFS_CONSOLE_PORT takes the
+  # same key pair; the server creates its bucket on startup.
+  rustfs:
+    image: rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:-rustfsadmin}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "127.0.0.1:${RUSTFS_PORT:-9000}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   # Catches outgoing mail; the inbox is at http://localhost:8025.
@@ -53,6 +75,10 @@ services:
       MAIL_TRANSPORT: smtp
       SMTP_URL: smtp://mailpit:1025
       MAIL_FROM: ${MAIL_FROM:-Acme <noreply@example.com>}
+      STORAGE_ENDPOINT: http://rustfs:9000
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-app}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-rustfsadmin}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-rustfsadmin}
       # No default: the server refuses to start without a key.
       SECRET_KEY: ${SECRET_KEY:-}
       # Must stay below stop_grace_period.
@@ -61,6 +87,8 @@ services:
       - "127.0.0.1:${APP_PORT:-8080}:3000"
     depends_on:
       postgres:
+        condition: service_healthy
+      rustfs:
         condition: service_healthy
       mailpit:
         condition: service_healthy
@@ -72,3 +100,4 @@ services:
 
 volumes:
   postgres-data:
+  rustfs-data:

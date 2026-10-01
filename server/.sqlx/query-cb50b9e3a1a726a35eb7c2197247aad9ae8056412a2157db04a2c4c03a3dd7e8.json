@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select coalesce(sum(size), 0)::bigint as \"total!\" from files where owner_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cb50b9e3a1a726a35eb7c2197247aad9ae8056412a2157db04a2c4c03a3dd7e8"
+}

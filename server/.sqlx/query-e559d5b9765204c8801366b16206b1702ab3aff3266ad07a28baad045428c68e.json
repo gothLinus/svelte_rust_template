@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            select true as \"locked!\"\n            from (select pg_advisory_xact_lock($1, hashtext($2::uuid::text))) as lock\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locked!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e559d5b9765204c8801366b16206b1702ab3aff3266ad07a28baad045428c68e"
+}

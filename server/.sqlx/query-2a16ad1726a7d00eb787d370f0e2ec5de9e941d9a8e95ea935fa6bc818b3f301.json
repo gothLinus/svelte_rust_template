@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from object_deletions where object_key = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2a16ad1726a7d00eb787d370f0e2ec5de9e941d9a8e95ea935fa6bc818b3f301"
+}
