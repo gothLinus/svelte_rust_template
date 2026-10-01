@@ -37,6 +37,9 @@ pub struct AuthConfig {
     /// Defaults to 7 days with `REQUIRE_EMAIL_VERIFICATION=true`, where such an account cannot even
     /// sign in, and to keeping them otherwise, since there they are in use; `0` keeps them.
     pub unverified_account_ttl: Option<time::Duration>,
+    /// `AUDIT_LOG_RETENTION`: audit events older than this are deleted. Defaults to 90 days; `0`
+    /// keeps them as long as their account.
+    pub audit_retention: Option<time::Duration>,
     pub argon2: Argon2Params,
 }
 
@@ -150,6 +153,9 @@ impl Reader<'_> {
             Some(self.duration("UNVERIFIED_ACCOUNT_TTL", unverified_default, year))
                 .filter(|ttl| !ttl.is_zero())
                 .map(signed);
+        let audit_retention = Some(self.duration("AUDIT_LOG_RETENTION", 90 * DAY, 10 * year))
+            .filter(|retention| !retention.is_zero())
+            .map(signed);
 
         let argon2_defaults = Argon2Params::default();
         let argon2 = Argon2Params {
@@ -186,6 +192,7 @@ impl Reader<'_> {
             },
             require_email_verification,
             unverified_account_ttl,
+            audit_retention,
             argon2,
         })
     }

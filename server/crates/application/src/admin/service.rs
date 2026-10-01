@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use domain::{
+    audit::{AuditAction, AuditRepository, NewAuditEvent},
     clock::Clock,
     database::{Database, Transaction},
     error::StorageError,
@@ -96,6 +97,12 @@ impl<A: Adapters> AdminService<A> {
         match tx.grant_role(id, &role).await {
             Ok(true) => {
                 tx.flag_user_sessions_for_rotation(id).await?;
+                tx.record_audit_event(
+                    &self
+                        .admin_event(actor, id, AuditAction::RoleGranted)
+                        .detail(role.as_str()),
+                )
+                .await?;
             }
             Ok(false) => {}
             Err(StorageError::ForeignKeyViolation { .. }) => return Err(AppError::NotFound),
@@ -140,6 +147,12 @@ impl<A: Adapters> AdminService<A> {
                 ensure_someone_manages_users(&mut tx).await?;
             }
             tx.flag_user_sessions_for_rotation(id).await?;
+            tx.record_audit_event(
+                &self
+                    .admin_event(actor, id, AuditAction::RoleRevoked)
+                    .detail(role.as_str()),
+            )
+            .await?;
         }
         let dto = user_dto(&mut tx, &user).await?;
         tx.commit().await?;
@@ -170,10 +183,24 @@ impl<A: Adapters> AdminService<A> {
         tx.lock_role_assignments().await?;
         let held = tx.permissions_of_user(id).await?;
         AdminPolicy::can_set_disabled_holder_of(actor, held)?;
+        let was_disabled = tx
+            .find_user_for_update(id)
+            .await?
+            .ok_or(AppError::NotFound)?
+            .is_disabled();
         let user = tx
             .set_user_disabled(id, at)
             .await?
             .ok_or(AppError::NotFound)?;
+        if was_disabled != disabled {
+            let action = if disabled {
+                AuditAction::AccountDisabled
+            } else {
+                AuditAction::AccountEnabled
+            };
+            tx.record_audit_event(&self.admin_event(actor, id, action))
+                .await?;
+        }
         if disabled {
             access::revoke_all(&mut tx, id, None).await?;
             if held.contains(Permission::UsersManage) {
@@ -185,6 +212,13 @@ impl<A: Adapters> AdminService<A> {
 
         tracing::info!(actor = %actor.user_id, user_id = %id, ?status, "account status changed");
         Ok(dto)
+    }
+
+    /// An event about `user` caused by the administrator `actor`.
+    fn admin_event(&self, actor: &Actor, user: UserId, action: AuditAction) -> NewAuditEvent {
+        self.ctx
+            .event(user, action, &actor.client)
+            .by(actor.user_id)
     }
 }
 

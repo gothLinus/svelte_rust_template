@@ -145,6 +145,7 @@ async fn the_maintenance_task_deletes_expired_sessions(pool: PgPool) {
             tokens: domain::user_token::TokenPolicy::default(),
             require_email_verification: false,
             unverified_account_ttl: None,
+            audit_retention: None,
             links: Links::new("http://localhost:5173"),
             text_countries: Vec::new(),
             locale: domain::i18n::Locale::EN,

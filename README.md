@@ -21,6 +21,8 @@ locales/   Fluent translations for the server and the web app
 - Email verification, password reset, session list with revocation.
 - Account deletion and a JSON export of the user's data.
 - Roles and permissions with ownership rules.
+- An audit log of security events (sign-ins, failed attempts, changed sign-in methods, role
+  changes): users see their own on the security page, holders of `audit:read` see everyone's.
 - Problem Details errors (RFC 9457) with field-level validation, keyset pagination.
 - Translations in Fluent files, English included.
 - `just new-resource` scaffolds a new resource in every layer, copied from the `notes` example.
@@ -110,6 +112,8 @@ from the same origin; in development Vite proxies `/api`.
 - A strict CSP, HSTS, `nosniff`, `X-Frame-Options` and related headers; `no-store` on API
   responses.
 - Mail and texts are queued in an outbox table, encrypted with `SECRET_KEY`.
+- Security events are written in the same transaction as the change they record, with the
+  request's IP and user agent, and kept for `AUDIT_LOG_RETENTION` (90 days by default).
 
 ## API
 

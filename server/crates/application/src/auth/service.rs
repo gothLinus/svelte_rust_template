@@ -19,6 +19,7 @@ use crate::{
     tokens,
 };
 use domain::{
+    audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
     i18n::Message,
@@ -150,6 +151,8 @@ impl<A: Adapters> AuthService<A> {
         };
         tx.grant_role(user.id(), &domain::rbac::RoleName::USER)
             .await?;
+        tx.record_audit_event(&self.ctx.event(user.id(), AuditAction::Registered, &client))
+            .await?;
         let verification = tokens::issue(
             &self.ctx,
             &mut tx,
@@ -168,8 +171,15 @@ impl<A: Adapters> AuthService<A> {
                 browser: tokens::registration_mark(&self.ctx, user.id(), now),
             }
         } else {
-            let signed_in =
-                signin::start_session(&self.ctx, &mut tx, &user, client, None, now).await?;
+            let signed_in = signin::start_session(
+                &self.ctx,
+                &mut tx,
+                &user,
+                client,
+                None,
+                AuthMethod::Registration,
+            )
+            .await?;
             tx.commit().await?;
             Registered::SignedIn(Box::new(signed_in))
         };
@@ -243,9 +253,14 @@ impl<A: Adapters> AuthService<A> {
             .hasher
             .verify(password, user.as_ref().and_then(User::password_hash))
             .await?;
-        let user = user
-            .filter(|_| matches)
-            .ok_or(AppError::InvalidCredentials)?;
+        let user = match user {
+            Some(user) if matches => user,
+            Some(user) => {
+                self.record_failure(&user, &client).await?;
+                return Err(AppError::InvalidCredentials);
+            }
+            None => return Err(AppError::InvalidCredentials),
+        };
         if user
             .password_hash()
             .is_some_and(|hash| self.ctx.hasher.needs_rehash(hash))
@@ -253,7 +268,24 @@ impl<A: Adapters> AuthService<A> {
             self.rehash(&user, password).await?;
         }
 
-        signin::complete_first_step(&self.ctx, &user, client, previous).await
+        signin::complete_first_step(&self.ctx, &user, client, previous, AuthMethod::Password).await
+    }
+
+    /// Records a wrong password for an existing account. Unknown identifiers are not recorded:
+    /// there is no account to file them under.
+    async fn record_failure(&self, user: &User, client: &ClientInfo) -> Result<(), AppError> {
+        self.ctx
+            .db
+            .connection()
+            .await?
+            .record_audit_event(
+                &self
+                    .ctx
+                    .event(user.id(), AuditAction::SignInFailed, client)
+                    .detail(AuthMethod::Password.detail()),
+            )
+            .await?;
+        Ok(())
     }
 
     async fn rehash(&self, user: &User, password: &Secret) -> Result<(), AppError> {
@@ -301,8 +333,12 @@ impl<A: Adapters> AuthService<A> {
     /// privileges changed ([`Authenticated::rotated_token`]).
     ///
     /// The one lookup also loads the user's permissions, so a demoted user loses access on the next
-    /// request.
-    pub async fn authenticate(&self, token: &Secret) -> Result<Option<Authenticated>, AppError> {
+    /// request. `client` is the request's, carried by the [`Actor`] into the audit log.
+    pub async fn authenticate(
+        &self,
+        token: &Secret,
+        client: ClientInfo,
+    ) -> Result<Option<Authenticated>, AppError> {
         if token.is_empty() || !token.is_within_limit() {
             return Ok(None);
         }
@@ -349,6 +385,7 @@ impl<A: Adapters> AuthService<A> {
             permissions,
             email_verified: user.is_email_verified(),
             recently_authenticated: session.is_recently_authenticated(now),
+            client,
         };
         Ok(Some(Authenticated {
             actor,
@@ -375,6 +412,12 @@ impl<A: Adapters> AuthService<A> {
     pub async fn logout_everywhere(&self, actor: &Actor) -> Result<u64, AppError> {
         let mut tx = self.ctx.db.transaction().await?;
         let revoked = access::revoke_all(&mut tx, actor.user_id, None).await?;
+        tx.record_audit_event(
+            &self
+                .ctx
+                .actor_event(actor, AuditAction::SignedOutEverywhere),
+        )
+        .await?;
         tx.commit().await?;
         tracing::info!(user_id = %actor.user_id, revoked, "signed out everywhere");
         Ok(revoked)
@@ -395,6 +438,7 @@ impl<A: Adapters> AuthService<A> {
         &self,
         request: VerifyEmailRequest,
         browser: Browser<'_>,
+        client: ClientInfo,
     ) -> Result<(), AppError> {
         let token = request.token.0;
         if token.is_empty() || !token.is_within_limit() {
@@ -423,7 +467,7 @@ impl<A: Adapters> AuthService<A> {
         } else {
             access::Prover::Owner
         };
-        let outcome = access::prove_email_ownership(&mut tx, user_id, now, prover).await?;
+        let outcome = access::prove_email_ownership(&mut tx, user_id, now, prover, &client).await?;
         tx.commit().await?;
 
         if outcome.password_removed {
@@ -518,7 +562,11 @@ impl<A: Adapters> AuthService<A> {
     ///
     /// [`AppError::InvalidToken`] for a link that is unknown, expired or already used; a validation
     /// error for a password that does not meet the rules.
-    pub async fn reset_password(&self, request: ResetPasswordRequest) -> Result<(), AppError> {
+    pub async fn reset_password(
+        &self,
+        request: ResetPasswordRequest,
+        client: ClientInfo,
+    ) -> Result<(), AppError> {
         let reset = PasswordReset::try_from(request)?;
         if !reset.token.is_within_limit() {
             return Err(AppError::InvalidToken);
@@ -547,15 +595,18 @@ impl<A: Adapters> AuthService<A> {
             .user_id;
         // The first proof evicts whoever got in before, their password included, so the new one is
         // set after it.
-        let user = access::prove_email_ownership(&mut tx, user_id, now, access::Prover::Owner)
-            .await?
-            .user;
+        let user =
+            access::prove_email_ownership(&mut tx, user_id, now, access::Prover::Owner, &client)
+                .await?
+                .user;
         if !tx.set_user_password(user_id, Some(&hash)).await? {
             return Err(AppError::InvalidToken);
         }
         // Whoever had access before must not keep it: sessions, but also pending links, codes and
         // second steps.
         access::revoke_all(&mut tx, user_id, None).await?;
+        tx.record_audit_event(&self.ctx.event(user_id, AuditAction::PasswordReset, &client))
+            .await?;
         tx.commit().await?;
 
         let forgot = self.ctx.settings.links.forgot_password();
@@ -576,6 +627,7 @@ impl<A: Adapters> AuthService<A> {
         &self,
         request: ConfirmEmailRequest,
         current: Option<&Secret>,
+        client: ClientInfo,
     ) -> Result<(), AppError> {
         let token = request.token.0;
         if token.is_empty() || !token.is_within_limit() {
@@ -618,6 +670,13 @@ impl<A: Adapters> AuthService<A> {
             .await?;
         let keep = self.own_session(&mut tx, current, user.id()).await?;
         tx.delete_user_sessions(user.id(), keep).await?;
+        tx.record_audit_event(
+            &self
+                .ctx
+                .event(user.id(), AuditAction::EmailChanged, &client)
+                .detail(new_email.masked()),
+        )
+        .await?;
         tx.commit().await?;
 
         mail::notify(
@@ -636,6 +695,7 @@ impl<A: Adapters> AuthService<A> {
     pub async fn cancel_email_change(
         &self,
         request: CancelEmailChangeRequest,
+        client: ClientInfo,
     ) -> Result<(), AppError> {
         let token = request.token.0;
         if token.is_empty() || !token.is_within_limit() {
@@ -672,6 +732,12 @@ impl<A: Adapters> AuthService<A> {
             }
         }
         access::revoke_all(&mut tx, user.id(), None).await?;
+        tx.record_audit_event(&self.ctx.event(
+            user.id(),
+            AuditAction::EmailChangeCancelled,
+            &client,
+        ))
+        .await?;
         tx.commit().await?;
 
         let forgot = self.ctx.settings.links.forgot_password();

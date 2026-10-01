@@ -10,6 +10,7 @@ nav-dashboard = Dashboard
 nav-profile = Profile
 nav-security = Security
 nav-users = Users
+nav-audit = Audit log
 
 # Landmark name of the main navigation (screen readers).
 nav-main = Main

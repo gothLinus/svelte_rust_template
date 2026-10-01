@@ -1,5 +1,6 @@
 import {
 	AddPhoneRequestSchema,
+	AuditEventPageSchema,
 	ChangeEmailRequestSchema,
 	CodeRequestSchema,
 	DeleteAccountRequestSchema,
@@ -81,6 +82,9 @@ export function meApi(client: ApiClient) {
 		sessions: async () =>
 			(await client.get('/me/sessions', { response: message(SessionListSchema) })).sessions,
 		revokeSession: (id: string) => client.delete(`/me/sessions/${segment(id)}`),
+		/** The user's own security events, newest first. */
+		activity: (query: { limit?: number; after?: string } = {}) =>
+			client.get('/me/activity', { query: { ...query }, response: message(AuditEventPageSchema) }),
 
 		security: () => client.get('/me/security', { response: message(SecurityOverviewSchema) }),
 		startTotp: () => client.post('/me/mfa/totp', { response: message(TotpSetupSchema) }),

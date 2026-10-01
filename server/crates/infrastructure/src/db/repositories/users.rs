@@ -99,6 +99,26 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
         .transpose()
     }
 
+    async fn find_users(&mut self, ids: &[UserId]) -> Result<Vec<User>, StorageError> {
+        let ids: Vec<Uuid> = ids.iter().map(UserId::as_uuid).collect();
+        sqlx::query_as!(
+            UserRow,
+            r#"
+            select id, email, username, phone, phone_verified_at, password_hash,
+                email_verified_at, disabled_at, created_at, updated_at
+            from users
+            where id = any($1)
+            "#,
+            &ids,
+        )
+        .fetch_all(self.conn())
+        .await
+        .map_err(db_error)?
+        .into_iter()
+        .map(User::try_from)
+        .collect()
+    }
+
     async fn find_user_for_update(&mut self, id: UserId) -> Result<Option<User>, StorageError> {
         sqlx::query_as!(
             UserRow,

@@ -60,6 +60,7 @@ pub fn settings() -> Settings {
         tokens: TokenPolicy::default(),
         require_email_verification: false,
         unverified_account_ttl: None,
+        audit_retention: None,
         links: Links::new(APP_URL),
         text_countries: Vec::new(),
         locale: Locale::EN,
@@ -136,7 +137,7 @@ impl Fixture {
     pub async fn authenticate(&self, token: &Secret) -> Authenticated {
         self.services
             .auth
-            .authenticate(token)
+            .authenticate(token, ClientInfo::default())
             .await
             .unwrap()
             .expect("the token is not valid")

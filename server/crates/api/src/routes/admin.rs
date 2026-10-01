@@ -6,6 +6,7 @@
 use application::{
     Adapters,
     admin::dto::ListUsersQuery,
+    audit::dto::{AuditEventDto, ListAuditQuery},
     dto::{RoleDto, UserDto},
     pagination::PageDto,
 };
@@ -34,6 +35,17 @@ pub fn routes<A: Adapters>() -> Router<AppState<A>> {
         .route("/admin/users/{id}/disable", post(disable::<A>))
         .route("/admin/users/{id}/enable", post(enable::<A>))
         .route("/admin/roles", get(list_roles::<A>))
+        .route("/admin/audit", get(list_audit_events::<A>))
+}
+
+async fn list_audit_events<A: Adapters>(
+    State(state): State<AppState<A>>,
+    admin: RequirePermission<permission::AuditRead>,
+    Query(query): Query<ListAuditQuery>,
+) -> Result<Proto<PageDto<AuditEventDto>>, ApiError> {
+    Ok(Proto(
+        state.services.audit.list(admin.actor(), query).await?,
+    ))
 }
 
 async fn list_users<A: Adapters>(

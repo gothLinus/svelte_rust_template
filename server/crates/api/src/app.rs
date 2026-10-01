@@ -118,6 +118,7 @@ pub fn settings(config: &Config) -> Settings {
         tokens: config.auth.tokens,
         require_email_verification: config.auth.require_email_verification,
         unverified_account_ttl: config.auth.unverified_account_ttl,
+        audit_retention: config.auth.audit_retention,
         links: Links::new(config.http.public_url.as_str()),
         text_countries: config.texts.allowed_countries.clone(),
         locale: DEFAULT_LOCALE,

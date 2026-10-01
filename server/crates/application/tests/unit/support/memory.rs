@@ -10,6 +10,7 @@ use std::{
 };
 
 use domain::{
+    audit::{AuditEvent, AuditFilter, AuditRepository, NewAuditEvent},
     database::{Database, StorageError, Transaction},
     identity::{ExternalIdentity, OAuthFlow},
     mfa::{MfaChallenge, TotpCredential},
@@ -49,6 +50,7 @@ pub struct State {
     pub totp_started: BTreeMap<UserId, OffsetDateTime>,
     pub recovery_codes: Vec<(UserId, TokenHash)>,
     pub mfa_challenges: Vec<MfaChallenge>,
+    pub audit_events: Vec<AuditEvent>,
     pub broken: bool,
 }
 
@@ -83,6 +85,7 @@ impl Default for State {
             totp_started: BTreeMap::new(),
             recovery_codes: Vec::new(),
             mfa_challenges: Vec::new(),
+            audit_events: Vec::new(),
             broken: false,
         }
     }
@@ -258,6 +261,15 @@ impl UserRepository for Mem {
 
     async fn find_user(&mut self, id: UserId) -> Result<Option<User>, StorageError> {
         self.with(|state| Ok(state.users.get(&id).cloned()))
+    }
+
+    async fn find_users(&mut self, ids: &[UserId]) -> Result<Vec<User>, StorageError> {
+        self.with(|state| {
+            Ok(ids
+                .iter()
+                .filter_map(|id| state.users.get(id).cloned())
+                .collect())
+        })
     }
 
     async fn find_user_for_update(&mut self, id: UserId) -> Result<Option<User>, StorageError> {
@@ -464,6 +476,7 @@ fn delete_user(state: &mut State, id: UserId) -> bool {
             state
                 .mfa_challenges
                 .retain(|challenge| challenge.user_id != id);
+            state.audit_events.retain(|event| event.user_id != id);
             state.users.remove(&id).is_some()
         }
     }
@@ -762,6 +775,55 @@ impl UserTokenRepository for Mem {
             let before = state.tokens.len();
             state.tokens.retain(|token| token.expires_at > now);
             Ok((before - state.tokens.len()) as u64)
+        })
+    }
+}
+
+impl AuditRepository for Mem {
+    async fn record_audit_event(&mut self, event: &NewAuditEvent) -> Result<(), StorageError> {
+        self.with(|state| {
+            state.audit_events.push(AuditEvent {
+                id: event.id,
+                user_id: event.user_id,
+                actor_id: event.actor_id,
+                action: event.action,
+                detail: event.detail.clone(),
+                client: event.client.clone(),
+                occurred_at: event.occurred_at,
+            });
+            Ok(())
+        })
+    }
+
+    async fn list_audit_events(
+        &mut self,
+        filter: &AuditFilter,
+        request: PageRequest,
+    ) -> Result<Page<AuditEvent>, StorageError> {
+        self.with(|state| {
+            let mut matching: Vec<AuditEvent> = state
+                .audit_events
+                .iter()
+                .filter(|event| filter.user_id.is_none_or(|user| event.user_id == user))
+                .cloned()
+                .collect();
+            matching.sort_by_key(|event| event.id.as_uuid());
+            Ok(page(matching.into_iter(), &request, |event| {
+                event.id.as_uuid()
+            }))
+        })
+    }
+
+    async fn delete_audit_events_before(
+        &mut self,
+        cutoff: OffsetDateTime,
+    ) -> Result<u64, StorageError> {
+        self.with(|state| {
+            let before = state.audit_events.len();
+            state
+                .audit_events
+                .retain(|event| event.occurred_at >= cutoff);
+            Ok((before - state.audit_events.len()) as u64)
         })
     }
 }

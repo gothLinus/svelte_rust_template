@@ -64,6 +64,7 @@ fn minimal_config_uses_defaults() {
     assert_eq!(config.auth.secret_key.bytes()[31], 31);
     assert!(matches!(config.texts.transport, TextTransport::Disabled));
     assert!(config.oauth.providers.is_empty());
+    assert_eq!(config.auth.audit_retention, Some(time::Duration::days(90)));
 }
 
 #[test]
@@ -98,6 +99,7 @@ fn every_variable_is_read() {
         ("EMAIL_VERIFICATION_TTL", "2h"),
         ("PASSWORD_RESET_TTL", "15m"),
         ("REQUIRE_EMAIL_VERIFICATION", "true"),
+        ("AUDIT_LOG_RETENTION", "0"),
         ("ARGON2_MEMORY_KIB", "8192"),
         ("ARGON2_ITERATIONS", "3"),
         ("ARGON2_PARALLELISM", "2"),
@@ -139,6 +141,7 @@ fn every_variable_is_read() {
         time::Duration::minutes(15)
     );
     assert!(config.auth.require_email_verification);
+    assert!(config.auth.audit_retention.is_none());
     assert_eq!(config.auth.argon2.memory_kib, 8192);
     assert_eq!(config.auth.argon2.max_concurrent, 8);
     assert_eq!(config.log_format, LogFormat::Json);
@@ -580,6 +583,10 @@ fn durations_are_bounded() {
         ["PASSWORD_RESET_TTL"]
     );
     assert_eq!(problems(&[("MAGIC_LINK_TTL", "0")]), ["MAGIC_LINK_TTL"]);
+    assert_eq!(
+        problems(&[("AUDIT_LOG_RETENTION", "3651d")]),
+        ["AUDIT_LOG_RETENTION"]
+    );
     assert_eq!(
         problems(&[("SHUTDOWN_TIMEOUT", "1h")]),
         ["SHUTDOWN_TIMEOUT"]

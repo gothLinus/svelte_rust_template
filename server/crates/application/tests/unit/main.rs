@@ -7,6 +7,7 @@
 
 mod account;
 mod admin;
+mod audit;
 mod auth;
 mod crud;
 mod dto;

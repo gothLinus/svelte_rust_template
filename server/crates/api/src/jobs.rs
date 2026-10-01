@@ -42,13 +42,21 @@ async fn delete_expired<A: Adapters>(services: &Services<A>) {
             sessions: 0,
             tokens: 0,
             accounts: 0,
+            audit_events: 0,
         }) => {}
         Ok(Cleanup {
             sessions,
             tokens,
             accounts,
+            audit_events,
         }) => {
-            tracing::debug!(sessions, tokens, accounts, "deleted expired rows");
+            tracing::debug!(
+                sessions,
+                tokens,
+                accounts,
+                audit_events,
+                "deleted expired rows"
+            );
         }
         Err(err) => tracing::warn!(error = %ErrorChain(&err), "maintenance failed"),
     }

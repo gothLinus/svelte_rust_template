@@ -206,6 +206,7 @@ async fn verify_email<A: Adapters>(
                 session: session.as_ref(),
                 registration: registration.as_ref(),
             },
+            client.0,
         )
         .await?;
     Ok((state.registration_cookie.clear(jar), StatusCode::NO_CONTENT))
@@ -264,7 +265,7 @@ async fn reset_password<A: Adapters>(
         .limits
         .check_ip(Action::PasswordReset, client.ip())
         .await?;
-    state.services.auth.reset_password(body).await?;
+    state.services.auth.reset_password(body, client.0).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -282,7 +283,7 @@ async fn confirm_email<A: Adapters>(
     state
         .services
         .auth
-        .confirm_email_change(body, current.as_ref())
+        .confirm_email_change(body, current.as_ref(), client.0)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -296,6 +297,10 @@ async fn cancel_email_change<A: Adapters>(
         .limits
         .check_ip(Action::Verification, client.ip())
         .await?;
-    state.services.auth.cancel_email_change(body).await?;
+    state
+        .services
+        .auth
+        .cancel_email_change(body, client.0)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

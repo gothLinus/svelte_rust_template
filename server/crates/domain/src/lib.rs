@@ -12,6 +12,7 @@
 //!   a rule depends on (expiry, idle timeouts, attempt windows) uses the injected
 //!   [`clock::Clock`], so tests control it.
 
+pub mod audit;
 pub mod clock;
 pub mod database;
 pub mod error;

@@ -5,4 +5,5 @@
 export const NOTES = 'app:notes';
 export const SESSIONS = 'app:sessions';
 export const ADMIN_USERS = 'app:admin-users';
+export const AUDIT = 'app:audit';
 export const SECURITY = 'app:security';

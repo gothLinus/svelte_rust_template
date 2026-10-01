@@ -9,8 +9,10 @@ use application::{
         AddPhoneRequest, ChangeEmailRequest, DeleteAccountRequest, SecurityDto,
         UpdateProfileRequest,
     },
+    audit::dto::{AuditEventDto, ListActivityQuery},
     dto::{MeDto, SessionDto},
     mfa::dto::CodeRequest,
+    pagination::PageDto,
 };
 use axum::{
     Json, Router,
@@ -24,7 +26,7 @@ use domain::session::SessionId;
 use uuid::Uuid;
 
 use crate::{
-    extract::{Client, CurrentUser, Path, Proto},
+    extract::{Client, CurrentUser, Path, Proto, Query},
     problem::ApiError,
     rate_limit::Action,
     state::AppState,
@@ -46,6 +48,17 @@ pub fn routes<A: Adapters>() -> Router<AppState<A>> {
         .route("/me/export", get(export::<A>))
         .route("/me/sessions", get(sessions::<A>))
         .route("/me/sessions/{id}", delete(revoke_session::<A>))
+        .route("/me/activity", get(activity::<A>))
+}
+
+async fn activity<A: Adapters>(
+    State(state): State<AppState<A>>,
+    user: CurrentUser,
+    Query(query): Query<ListActivityQuery>,
+) -> Result<Proto<PageDto<AuditEventDto>>, ApiError> {
+    Ok(Proto(
+        state.services.audit.activity(user.actor(), query).await?,
+    ))
 }
 
 async fn export<A: Adapters>(

@@ -101,6 +101,7 @@ async fn verify(fx: &Fixture, email: &str, browser: Browser<'_>) {
                 token: application::dto::SecretInput(fx.mail.token_for(email)),
             },
             browser,
+            ClientInfo::default(),
         )
         .await
         .unwrap();
@@ -153,10 +154,13 @@ async fn reset_password(fx: &Fixture, email: &str) {
         .unwrap();
     fx.services
         .auth
-        .reset_password(ResetPasswordRequest {
-            token: application::dto::SecretInput(fx.mail.token_for(email)),
-            password: secret("the owner's new password"),
-        })
+        .reset_password(
+            ResetPasswordRequest {
+                token: application::dto::SecretInput(fx.mail.token_for(email)),
+                password: secret("the owner's new password"),
+            },
+            ClientInfo::default(),
+        )
         .await
         .unwrap();
 }
@@ -286,10 +290,13 @@ async fn the_attackers_password_does_not_survive_the_verification_link() {
     assert_eq!(offer.template, "choose_password");
     fx.services
         .auth
-        .reset_password(ResetPasswordRequest {
-            token: application::dto::SecretInput(fx.mail.token_for("victim@example.com")),
-            password: secret("the owner's own password"),
-        })
+        .reset_password(
+            ResetPasswordRequest {
+                token: application::dto::SecretInput(fx.mail.token_for("victim@example.com")),
+                password: secret("the owner's own password"),
+            },
+            ClientInfo::default(),
+        )
         .await
         .unwrap();
     assert!(password_works(&fx, "victim@example.com", "the owner's own password").await);
@@ -404,6 +411,7 @@ async fn a_reset_cancels_a_pending_email_change() {
                 token: application::dto::SecretInput(change),
             },
             None,
+            ClientInfo::default(),
         )
         .await
         .unwrap_err();
@@ -453,6 +461,7 @@ async fn signing_out_everywhere_cancels_pending_links_and_second_steps() {
                 token: application::dto::SecretInput(change),
             },
             None,
+            ClientInfo::default(),
         )
         .await
         .unwrap_err();

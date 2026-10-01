@@ -15,6 +15,7 @@ pub fn permission(permission: PermissionName) -> v1::Permission {
         PermissionName::NotesManage => v1::Permission::NotesManage,
         PermissionName::UsersRead => v1::Permission::UsersRead,
         PermissionName::UsersManage => v1::Permission::UsersManage,
+        PermissionName::AuditRead => v1::Permission::AuditRead,
     }
 }
 

@@ -2,7 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { SignedIn } from '$lib/api';
 import { t } from '$lib/i18n';
 import type { Permission } from '$lib/types/api';
-import { hasPermission } from './permissions';
+import { hasAnyPermission, hasPermission } from './permissions';
 
 /**
  * Route guards for `+layout.ts` `load` functions. They only decide what to show: the API
@@ -51,6 +51,12 @@ export function requireUser(me: SignedIn | null, url: URL): SignedIn {
 
 export function requirePermission(me: SignedIn, permission: Permission): void {
 	if (!hasPermission(me, permission)) {
+		error(403, t('error-forbidden'));
+	}
+}
+
+export function requireAnyPermission(me: SignedIn, ...permissions: Permission[]): void {
+	if (!hasAnyPermission(me, ...permissions)) {
 		error(403, t('error-forbidden'));
 	}
 }

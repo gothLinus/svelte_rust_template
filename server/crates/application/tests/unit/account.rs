@@ -58,10 +58,13 @@ async fn changing_the_password_goes_through_a_mailed_link() {
     let token = fx.mail.token_for("alice@example.com");
     fx.services
         .auth
-        .reset_password(ResetPasswordRequest {
-            token: application::dto::SecretInput(token),
-            password: secret("a new password"),
-        })
+        .reset_password(
+            ResetPasswordRequest {
+                token: application::dto::SecretInput(token),
+                password: secret("a new password"),
+            },
+            ClientInfo::default(),
+        )
         .await
         .unwrap();
 
@@ -121,7 +124,7 @@ async fn revoking_a_session_only_works_for_your_own() {
     assert!(
         fx.services
             .auth
-            .authenticate(&other.token)
+            .authenticate(&other.token, ClientInfo::default())
             .await
             .unwrap()
             .is_none()

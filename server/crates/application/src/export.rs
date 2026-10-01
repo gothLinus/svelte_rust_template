@@ -16,6 +16,7 @@ pub const EXPORTED_TABLES: &[&str] = &[
     "passkeys",
     "totp_credentials",
     "recovery_codes",
+    "audit_events",
     "notes",
 ];
 

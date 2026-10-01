@@ -7,6 +7,7 @@
 	import { oauthErrorMessage, reauth } from '$lib/auth';
 	import { t } from '$lib/i18n';
 	import PageHeading from '$lib/components/page-heading.svelte';
+	import ActivityCard from '$lib/components/security/activity-card.svelte';
 	import LinkedAccountsCard, {
 		takeLinkingProvider
 	} from '$lib/components/security/linked-accounts-card.svelte';
@@ -53,3 +54,4 @@
 <PasskeysCard passkeys={data.security.passkeys} mfaEnabled={data.security.mfaEnabled} />
 <LinkedAccountsCard providers={data.methods.providers} linked={data.security.linkedAccounts} />
 <SessionsCard sessions={data.sessions} />
+<ActivityCard activity={data.activity} providers={data.methods.providers} />

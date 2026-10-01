@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use domain::{
+    audit::{AuditAction, AuditRepository, NewAuditEvent},
     clock::Clock,
     database::Database,
     error::ValidationError,
@@ -17,13 +18,16 @@ use domain::{
     rbac::RbacRepository,
     repository::Repository,
     security::{Crypto, PasswordHasher, TokenGenerator},
-    session::{SessionPolicy, SessionRepository},
+    session::{ClientInfo, SessionPolicy, SessionRepository},
     text::TextSender,
-    user::UserRepository,
+    user::{UserId, UserRepository},
     user_token::{TokenPolicy, UserTokenRepository},
 };
 
-use crate::mail::{Links, Voice};
+use crate::{
+    actor::Actor,
+    mail::{Links, Voice},
+};
 
 /// Every repository the application uses, implemented on one connection type.
 ///
@@ -42,6 +46,7 @@ pub trait Store:
     + IdentityRepository
     + PasskeyRepository
     + MfaRepository
+    + AuditRepository
     + Repository<Note>
 {
 }
@@ -55,6 +60,7 @@ impl<T> Store for T where
         + IdentityRepository
         + PasskeyRepository
         + MfaRepository
+        + AuditRepository
         + Repository<Note>
 {
 }
@@ -82,6 +88,9 @@ pub struct Settings {
     /// Accounts whose address is still unverified this long after registering are deleted
     /// (`UNVERIFIED_ACCOUNT_TTL`); `None` keeps them.
     pub unverified_account_ttl: Option<time::Duration>,
+    /// How long audit events are kept (`AUDIT_LOG_RETENTION`); `None` keeps them as long as the
+    /// account exists.
+    pub audit_retention: Option<time::Duration>,
     pub links: Links,
     /// Country calling codes phone numbers must start with to be texted. Empty allows every
     /// country.
@@ -138,5 +147,21 @@ impl<A: Adapters> Context<A> {
 
     pub(crate) fn say(&self, message: &Message) -> String {
         self.voice().say(message)
+    }
+
+    /// An audit event about `user`, happening now, from `client`.
+    pub(crate) fn event(
+        &self,
+        user: UserId,
+        action: AuditAction,
+        client: &ClientInfo,
+    ) -> NewAuditEvent {
+        NewAuditEvent::new(user, action, client.clone(), self.clock.now())
+    }
+
+    /// An audit event the actor caused on their own account.
+    pub(crate) fn actor_event(&self, actor: &Actor, action: AuditAction) -> NewAuditEvent {
+        self.event(actor.user_id, action, &actor.client)
+            .by(actor.user_id)
     }
 }

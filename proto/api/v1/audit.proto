@@ -1,0 +1,40 @@
+// The audit log: `/api/v1/me/activity` (the caller's own events) and `/api/v1/admin/audit`
+// (every account's, with `audit:read`). Filters are query parameters:
+// `?user=<id>&limit=20&after=<cursor>`; `user` only on the admin list.
+
+syntax = "proto3";
+
+package api.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// An account named in the audit log.
+message AuditUser {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+}
+
+message AuditEvent {
+  string id = 1;
+  // A stable name such as `signed_in`, `passkey_added` or `role_granted`; clients word it.
+  string action = 2;
+  // What the action concerned: how a sign-in was proven (`password`, `passkey`,
+  // `provider:google`), a role, a provider, a passkey's name.
+  optional string detail = 3;
+  // The account it is about. Only on the admin list.
+  optional AuditUser user = 4;
+  // Who caused it when that was someone else. Only on the admin list.
+  optional AuditUser actor = 5;
+  // Someone other than the account caused it (an administrator).
+  bool by_other = 6;
+  optional string ip = 7;
+  optional string user_agent = 8;
+  google.protobuf.Timestamp occurred_at = 9;
+}
+
+message AuditEventPage {
+  repeated AuditEvent items = 1;
+  // Pass as `after` to get the next page. Absent on the last page. Opaque.
+  optional string next_cursor = 2;
+}

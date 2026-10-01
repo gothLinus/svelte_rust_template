@@ -1,7 +1,7 @@
 use domain::{
     i18n::Message,
     rbac::{Permission, PermissionSet},
-    session::SessionId,
+    session::{ClientInfo, SessionId},
     user::UserId,
 };
 
@@ -20,6 +20,9 @@ pub struct Actor {
     /// The session signed in or re-authenticated within
     /// [`REAUTH_WINDOW`](domain::session::REAUTH_WINDOW).
     pub recently_authenticated: bool,
+    /// Where the current request came from, for the audit log. Not the session's: the session
+    /// keeps the client that signed in.
+    pub client: ClientInfo,
 }
 
 impl Actor {

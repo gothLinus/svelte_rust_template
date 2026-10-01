@@ -36,6 +36,7 @@ use crate::problem::ApiError;
 
 mod account;
 mod admin;
+mod audit;
 mod auth;
 mod common;
 mod mfa;

@@ -1,4 +1,5 @@
 use domain::{
+    audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
     i18n::Message,
@@ -63,17 +64,36 @@ pub(crate) async fn finish<A: Adapters>(
     challenge: &MfaChallenge,
     client: ClientInfo,
     previous: Option<&Secret>,
+    method: AuthMethod<'_>,
 ) -> Result<SignedIn, AppError> {
-    let now = ctx.clock.now();
     let mut tx = ctx.db.transaction().await?;
     if !tx.delete_mfa_challenge(&challenge.token_hash).await? {
         return Err(expired());
     }
     let user = tx.find_user(challenge.user_id).await?.ok_or_else(expired)?;
     signin::ensure_can_sign_in(ctx, &user)?;
-    let signed_in = signin::start_session(ctx, &mut tx, &user, client, previous, now).await?;
+    let signed_in = signin::start_session(ctx, &mut tx, &user, client, previous, method).await?;
     tx.commit().await?;
     Ok(signed_in)
+}
+
+/// Records a wrong answer to the second step: the first one was right, so it may be someone who
+/// knows the password.
+pub(crate) async fn record_failure<A: Adapters>(
+    ctx: &Context<A>,
+    challenge: &MfaChallenge,
+    client: &ClientInfo,
+    method: AuthMethod<'_>,
+) -> Result<(), AppError> {
+    ctx.db
+        .connection()
+        .await?
+        .record_audit_event(
+            &ctx.event(challenge.user_id, AuditAction::SignInFailed, client)
+                .detail(method.detail()),
+        )
+        .await?;
+    Ok(())
 }
 
 /// Replaces the user's recovery codes and returns them in display form (`xxxxx-xxxxx`). Only

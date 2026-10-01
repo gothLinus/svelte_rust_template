@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use domain::{
+    audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
     i18n::Message,
@@ -113,6 +114,8 @@ impl<A: Adapters> MfaService<A> {
         } else {
             None
         };
+        tx.record_audit_event(&self.ctx.actor_event(actor, AuditAction::TotpAdded))
+            .await?;
         tx.commit().await?;
 
         self.notify(&user, Message::new("notice-totp-added")).await;
@@ -145,6 +148,8 @@ impl<A: Adapters> MfaService<A> {
         if tx.count_user_passkeys(user.id()).await? == 0 {
             tx.replace_recovery_codes(user.id(), &[]).await?;
         }
+        tx.record_audit_event(&self.ctx.actor_event(actor, AuditAction::TotpRemoved))
+            .await?;
         tx.commit().await?;
 
         self.notify(&user, Message::new("notice-totp-removed"))
@@ -172,6 +177,12 @@ impl<A: Adapters> MfaService<A> {
             ));
         }
         let codes = challenge::new_recovery_codes(&self.ctx, &mut tx, actor.user_id).await?;
+        tx.record_audit_event(
+            &self
+                .ctx
+                .actor_event(actor, AuditAction::RecoveryCodesRegenerated),
+        )
+        .await?;
         tx.commit().await?;
         tracing::info!(user_id = %actor.user_id, "recovery codes regenerated");
         Ok(RecoveryCodesDto { codes })
@@ -228,9 +239,10 @@ impl<A: Adapters> MfaService<A> {
         };
         drop(conn);
         if !accepted {
+            challenge::record_failure(&self.ctx, &challenge, &client, AuthMethod::Totp).await?;
             return Err(AppError::invalid_code());
         }
-        challenge::finish(&self.ctx, &challenge, client, previous).await
+        challenge::finish(&self.ctx, &challenge, client, previous, AuthMethod::Totp).await
     }
 
     /// Finishes a sign-in with a recovery code, which is used up. Errors as
@@ -249,10 +261,19 @@ impl<A: Adapters> MfaService<A> {
                 .consume_recovery_code(challenge.user_id, &guess)
                 .await?;
         if !used {
+            challenge::record_failure(&self.ctx, &challenge, &client, AuthMethod::RecoveryCode)
+                .await?;
             return Err(AppError::invalid_code());
         }
 
-        let signed_in = challenge::finish(&self.ctx, &challenge, client, previous).await?;
+        let signed_in = challenge::finish(
+            &self.ctx,
+            &challenge,
+            client,
+            previous,
+            AuthMethod::RecoveryCode,
+        )
+        .await?;
         tracing::info!(user_id = %challenge.user_id, "signed in with a recovery code");
         Ok(signed_in)
     }

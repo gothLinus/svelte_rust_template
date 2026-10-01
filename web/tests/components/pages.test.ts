@@ -6,6 +6,7 @@ import { session } from '$lib/auth';
 import { i18n, t } from '$lib/i18n';
 import { create } from '@bufbuild/protobuf';
 import {
+	AuditEventPageSchema,
 	MeSchema,
 	Permission,
 	ResetPasswordRequestSchema,
@@ -20,6 +21,7 @@ import UserMenu from '$lib/components/user-menu.svelte';
 import EmailVerificationBanner from '$lib/components/email-verification-banner.svelte';
 import AppLayout from '../../src/routes/(app)/+layout.svelte';
 import AppError from '../../src/routes/(app)/+error.svelte';
+import AuditPage from '../../src/routes/(app)/admin/audit/+page.svelte';
 import UsersPage from '../../src/routes/(app)/admin/users/+page.svelte';
 import Dashboard from '../../src/routes/(app)/dashboard/+page.svelte';
 import RootError from '../../src/routes/+error.svelte';
@@ -42,7 +44,8 @@ import {
 	problem,
 	reply,
 	rootData,
-	sent
+	sent,
+	ts
 } from '../helpers';
 import { navigation, page, visit } from './fake-app.svelte';
 
@@ -242,6 +245,104 @@ describe('admin users', () => {
 		await openMenu(t('admin-manage-label', { name: 'bob' }));
 		await fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'admin' }));
 		await vi.waitFor(() => expect(navigation.invalidate).not.toHaveBeenCalled());
+	});
+
+	it('opens the activity of a user with audit:read, without the role controls', async () => {
+		visit('/admin/users');
+		render(UsersPage, {
+			data: {
+				...rootData(me([Permission.USERS_READ, Permission.AUDIT_READ])),
+				users: create(UserPageSchema, { items: [user(OTHER_ID, 'bob')] }),
+				roles: [create(RoleSchema, { name: 'admin' })],
+				search: '',
+				after: null
+			}
+		});
+
+		await openMenu(t('admin-manage-label', { name: 'bob' }));
+		expect(screen.queryByRole('menuitemcheckbox', { name: 'admin' })).toBeNull();
+		await fireEvent.click(await screen.findByRole('menuitem', { name: t('admin-view-activity') }));
+		expect(navigation.goto).toHaveBeenLastCalledWith(`/admin/audit?user=${OTHER_ID}`);
+	});
+});
+
+describe('audit log', () => {
+	function renderAudit(user: string | null = null) {
+		return render(AuditPage, {
+			data: {
+				...rootData(me([Permission.AUDIT_READ]), { providers: [{ id: 'google', name: 'Google' }] }),
+				events: create(AuditEventPageSchema, {
+					items: [
+						{
+							id: 'e2',
+							action: 'account_disabled',
+							byOther: true,
+							user: { id: OTHER_ID, username: 'bob', email: 'bob@example.com' },
+							actor: { id: me().user.id, username: 'alice', email: 'alice@example.com' },
+							ip: '198.51.100.4',
+							occurredAt: ts('2026-01-02T00:00:00Z')
+						},
+						{
+							id: 'e1',
+							action: 'signed_in',
+							detail: 'provider:google',
+							byOther: false,
+							user: { id: OTHER_ID, username: 'bob', email: 'bob@example.com' },
+							occurredAt: ts('2026-01-01T00:00:00Z')
+						},
+						{
+							id: 'e0',
+							action: 'role_granted',
+							detail: 'admin',
+							byOther: true,
+							user: { id: OTHER_ID, username: 'bob', email: 'bob@example.com' },
+							occurredAt: ts('2025-12-31T00:00:00Z')
+						}
+					],
+					nextCursor: 'c1'
+				}),
+				user,
+				after: null
+			}
+		});
+	}
+
+	it('words each event with its account, cause and origin', () => {
+		visit('/admin/audit');
+		renderAudit();
+
+		expect(screen.getByText(t('audit-action-account-disabled'))).toBeInTheDocument();
+		expect(screen.getByText(t('admin-audit-by', { name: 'alice' }))).toBeInTheDocument();
+		expect(screen.getByText('198.51.100.4')).toBeInTheDocument();
+		expect(screen.getByText('Google')).toBeInTheDocument();
+		expect(screen.getByText(t('admin-audit-by-deleted'))).toBeInTheDocument();
+		expect(screen.getAllByText('bob · bob@example.com')).toHaveLength(3);
+	});
+
+	it('filters by account and pages', async () => {
+		const user = userEvent.setup();
+		visit('/admin/audit');
+		renderAudit();
+
+		await user.click(
+			screen.getAllByRole('button', { name: t('admin-audit-filtered', { name: 'bob' }) })[0]!
+		);
+		expect(navigation.goto).toHaveBeenLastCalledWith(
+			`/admin/audit?user=${OTHER_ID}`,
+			expect.anything()
+		);
+		await user.click(screen.getByRole('button', { name: t('pagination-next') }));
+		expect(navigation.goto).toHaveBeenLastCalledWith('/admin/audit?after=c1', expect.anything());
+	});
+
+	it('names the account it is filtered to and shows all again', async () => {
+		const user = userEvent.setup();
+		visit(`/admin/audit?user=${OTHER_ID}`);
+		renderAudit(OTHER_ID);
+
+		expect(screen.getByText(t('admin-audit-filtered', { name: 'bob' }))).toBeInTheDocument();
+		await user.click(screen.getByRole('button', { name: t('admin-audit-show-all') }));
+		expect(navigation.goto).toHaveBeenLastCalledWith('/admin/audit', expect.anything());
 	});
 });
 
