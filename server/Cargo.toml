@@ -22,7 +22,7 @@ axum-extra = { version = "0.12.6", default-features = false }
 base64 = "0.23.1"
 dotenvy = "0.15.7"
 fluent-bundle = "0.16.0"
-fluent-langneg = "0.13.1"
+fluent-langneg = "0.14.2"
 fluent-syntax = "0.12.0"
 getrandom = "0.4.3"
 http-body-util = "0.1.5"
