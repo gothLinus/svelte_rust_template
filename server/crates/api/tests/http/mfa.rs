@@ -162,6 +162,8 @@ async fn answers_are_limited_per_account_however_many_attempts_are_started(pool:
                 check_code_per_account: tight,
                 ceremony_per_ip: generous,
                 report_per_ip: generous,
+                upload_per_ip: generous,
+                upload_per_account: generous,
             }),
             ..Options::default()
         },

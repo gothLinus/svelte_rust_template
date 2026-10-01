@@ -41,6 +41,7 @@ pub enum Action {
     CheckCode,
     Ceremony,
     Report,
+    Upload,
 }
 
 const MAX_RAW_KEY_CHARS: usize = 64;
@@ -125,6 +126,8 @@ enum Bucket {
     CheckCodeAccount,
     CeremonyIp,
     ReportIp,
+    UploadIp,
+    UploadAccount,
 }
 
 impl Bucket {
@@ -145,6 +148,8 @@ impl Bucket {
             Self::CheckCodeAccount => "check_code_account",
             Self::CeremonyIp => "ceremony_ip",
             Self::ReportIp => "report_ip",
+            Self::UploadIp => "upload_ip",
+            Self::UploadAccount => "upload_account",
         }
     }
 
@@ -165,6 +170,8 @@ impl Bucket {
             Self::CheckCodeAccount => rates.check_code_per_account,
             Self::CeremonyIp => rates.ceremony_per_ip,
             Self::ReportIp => rates.report_per_ip,
+            Self::UploadIp => rates.upload_per_ip,
+            Self::UploadAccount => rates.upload_per_account,
         };
         Some(rate)
     }
@@ -282,6 +289,7 @@ impl RateLimits {
             Action::CheckCode => Bucket::CheckCodeIp,
             Action::Ceremony => Bucket::CeremonyIp,
             Action::Report => Bucket::ReportIp,
+            Action::Upload => Bucket::UploadIp,
         };
         self.take(bucket, &ip.to_string()).await
     }
@@ -307,6 +315,7 @@ impl RateLimits {
             Action::Verification => Bucket::VerificationAccount,
             Action::SendCode => Bucket::SendCodeAccount,
             Action::CheckCode => Bucket::CheckCodeAccount,
+            Action::Upload => Bucket::UploadAccount,
             Action::Api | Action::Register | Action::Ceremony | Action::Report => {
                 return Ok(());
             }

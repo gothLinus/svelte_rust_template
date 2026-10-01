@@ -61,6 +61,7 @@ fn app() -> Router {
         hsts_max_age: None,
         cors_origins: Vec::new(),
         request_timeout: Duration::from_secs(10),
+        upload_timeout: Duration::from_secs(30),
         max_body_bytes: 64 * 1024,
         rate_limits: false,
         rates: api::rate_limit::Rates::default(),

@@ -230,6 +230,7 @@ fn title(status: StatusCode) -> Message {
         404 => "http-status-404",
         405 => "http-status-405",
         409 => "http-status-409",
+        411 => "http-status-411",
         412 => "http-status-412",
         413 => "http-status-413",
         415 => "http-status-415",
@@ -276,7 +277,9 @@ impl From<AppError> for ApiError {
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Stale => StatusCode::PRECONDITION_FAILED,
             AppError::Conflict { .. } => StatusCode::CONFLICT,
-            AppError::InvalidToken | AppError::InvalidPasskey => StatusCode::BAD_REQUEST,
+            AppError::InvalidToken | AppError::InvalidPasskey | AppError::IncompleteUpload => {
+                StatusCode::BAD_REQUEST
+            }
             AppError::ProviderUnavailable => StatusCode::BAD_GATEWAY,
             AppError::Busy => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Internal(source) => return Self::internal(source),

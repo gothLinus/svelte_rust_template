@@ -18,7 +18,7 @@ use axum::{
     extract::ConnectInfo,
     http::{
         HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode,
-        header::{CONTENT_TYPE, COOKIE, SET_COOKIE},
+        header::{CONTENT_ENCODING, CONTENT_TYPE, COOKIE, SET_COOKIE},
     },
 };
 use domain::{
@@ -34,7 +34,9 @@ use infrastructure::{
     config::{HttpConfig, PublicOrigin, RateLimitStore},
     crypto::{Argon2Hasher, Argon2Params, RandomTokens, RingCrypto},
     db::PostgresDatabase,
-    testing::{FakeIdentityProviders, ManualClock, RecordingMailer, RecordingTexts},
+    testing::{
+        FakeIdentityProviders, ManualClock, MemoryObjectStore, RecordingMailer, RecordingTexts,
+    },
 };
 use proto::{Message, v1};
 use serde_json::Value;
@@ -53,6 +55,7 @@ impl Adapters for TestAdapters {
     type Tokens = RandomTokens;
     type Crypto = RingCrypto;
     type Clock = ManualClock;
+    type Objects = MemoryObjectStore;
 }
 
 pub struct Options {
@@ -65,8 +68,10 @@ pub struct Options {
     pub hsts_max_age: Option<Duration>,
     pub trust_proxy: bool,
     pub max_body_bytes: usize,
-    /// The catalog the app words texts with; the embedded one when `None`. Tests of other
-    /// languages build one with `Catalog::from_sources`.
+    pub request_timeout: Duration,
+    pub file_quota: Option<u64>,
+    /// The catalog the app words texts with; the embedded one when `None`. Tests of other languages
+    /// build one with `Catalog::from_sources`.
     pub catalog: Option<Arc<Catalog>>,
 }
 
@@ -82,6 +87,8 @@ impl Default for Options {
             hsts_max_age: None,
             trust_proxy: false,
             max_body_bytes: 64 * 1024,
+            request_timeout: Duration::from_secs(10),
+            file_quota: None,
             catalog: None,
         }
     }
@@ -100,7 +107,8 @@ pub fn http_config(options: &Options) -> HttpConfig {
             .iter()
             .map(|origin| PublicOrigin::parse(origin).unwrap())
             .collect(),
-        request_timeout: Duration::from_secs(10),
+        request_timeout: options.request_timeout,
+        upload_timeout: Duration::from_secs(30),
         max_body_bytes: options.max_body_bytes,
         rate_limits: options.rates.is_some(),
         rates: options.rates.unwrap_or_default(),
@@ -117,6 +125,7 @@ pub struct TestApp {
     pub mail: RecordingMailer,
     pub texts: RecordingTexts,
     pub providers: FakeIdentityProviders,
+    pub objects: MemoryObjectStore,
     /// The catalog the app words its texts with: tests take the expected text from it
     /// ([`TestApp::text`]) instead of repeating English.
     pub catalog: Arc<Catalog>,
@@ -135,6 +144,7 @@ impl TestApp {
         let mail = RecordingMailer::new();
         let texts = RecordingTexts::new();
         let providers = FakeIdentityProviders::new();
+        let objects = MemoryObjectStore::new();
         let catalog = options
             .catalog
             .unwrap_or_else(|| Arc::new(Catalog::embedded().unwrap()));
@@ -153,6 +163,7 @@ impl TestApp {
             tokens: RandomTokens,
             crypto: RingCrypto::new(&[7; 32]),
             clock: clock.clone(),
+            objects: objects.clone(),
             mailer: Arc::new(mail.clone()),
             texts: Arc::new(texts.clone()),
             identity_providers: Arc::new(providers.clone()),
@@ -167,6 +178,7 @@ impl TestApp {
                 links: Links::new(ORIGIN),
                 text_countries: Vec::new(),
                 locale: Locale::EN,
+                file_quota: options.file_quota,
             },
         }));
         let limits = match options.rates {
@@ -193,6 +205,7 @@ impl TestApp {
             mail,
             texts,
             providers,
+            objects,
             catalog,
             cookie,
         }
@@ -214,10 +227,12 @@ impl TestApp {
         let headers = response.headers().clone();
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
         let text = String::from_utf8_lossy(&bytes).into_owned();
-        let is_json = headers
-            .get(CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .is_some_and(|value| value.starts_with("application/") && value.contains("json"));
+        // A compressed body is left as bytes: the tests only check that it was compressed.
+        let is_json = !headers.contains_key(CONTENT_ENCODING)
+            && headers
+                .get(CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.starts_with("application/") && value.contains("json"));
         let body = if is_json {
             serde_json::from_slice(&bytes).unwrap()
         } else {

@@ -15,6 +15,7 @@ mod admin;
 mod audit;
 mod auth;
 mod errors;
+mod files;
 mod health;
 mod i18n;
 mod mfa;

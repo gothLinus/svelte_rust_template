@@ -56,6 +56,8 @@ fn all(rate: Rate) -> Rates {
         check_code_per_account: rate,
         ceremony_per_ip: rate,
         report_per_ip: rate,
+        upload_per_ip: rate,
+        upload_per_account: rate,
     }
 }
 

@@ -43,18 +43,21 @@ async fn delete_expired<A: Adapters>(services: &Services<A>) {
             tokens: 0,
             accounts: 0,
             audit_events: 0,
+            objects: 0,
         }) => {}
         Ok(Cleanup {
             sessions,
             tokens,
             accounts,
             audit_events,
+            objects,
         }) => {
             tracing::debug!(
                 sessions,
                 tokens,
                 accounts,
                 audit_events,
+                objects,
                 "deleted expired rows"
             );
         }

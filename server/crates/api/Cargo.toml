@@ -15,6 +15,7 @@ application.workspace = true
 axum = { workspace = true, features = ["macros"] }
 axum-extra = { workspace = true, features = ["cookie"] }
 domain.workspace = true
+futures-util.workspace = true
 i18n.workspace = true
 infrastructure.workspace = true
 mimalloc.workspace = true

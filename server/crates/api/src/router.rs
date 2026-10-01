@@ -12,22 +12,21 @@
 //! 3. The routes: the group's own, `/health/*`, `/csp-reports`, and a JSON `404` for unknown `/api`
 //!    paths. With `static_dir` set, anything else is the SPA (see `crate::spa`).
 
-use std::{any::Any, iter, sync::Arc};
+use std::{any::Any, iter, sync::Arc, time::Duration};
 
 use application::Adapters;
 use axum::{
-    BoxError, Router,
-    body::Body,
-    error_handling::HandleErrorLayer,
-    extract::DefaultBodyLimit,
+    Router,
+    body::{Body, HttpBody},
+    extract::{DefaultBodyLimit, Request as AxumRequest, State},
     http::{HeaderName, HeaderValue, Method, Request, header},
-    middleware::from_fn_with_state,
+    middleware::{Next, from_fn_with_state},
     response::{IntoResponse, Response},
     routing::any,
 };
 use domain::i18n::Translator;
 use infrastructure::config::HttpConfig;
-use tower::{ServiceBuilder, timeout::TimeoutLayer, timeout::error::Elapsed};
+use tower::ServiceBuilder;
 use tower_http::{
     catch_panic::CatchPanicLayer,
     compression::{
@@ -141,12 +140,19 @@ pub fn with_middleware(
                 CompressionLayer::new()
                     .quality(COMPRESSION_LEVEL)
                     .compress_when(
-                        DefaultPredicate::new().and(SizeAbove::new(COMPRESSION_MIN_BYTES)),
+                        DefaultPredicate::new()
+                            .and(SizeAbove::new(COMPRESSION_MIN_BYTES))
+                            .and(NotFileContents),
                     ),
             )
             .layer(from_fn_with_state(translator, localize::apply))
-            .layer(HandleErrorLayer::new(middleware_error))
-            .layer(TimeoutLayer::new(config.request_timeout))
+            .layer(from_fn_with_state(
+                Timeouts {
+                    request: config.request_timeout,
+                    upload: config.upload_timeout,
+                },
+                timeout,
+            ))
             .layer(CatchPanicLayer::custom(panic_response))
             .layer(DefaultBodyLimit::max(config.max_body_bytes)),
     )
@@ -201,11 +207,32 @@ fn request_span(request: &Request<Body>) -> Span {
     span
 }
 
-async fn middleware_error(err: BoxError) -> ApiError {
-    if err.is::<Elapsed>() {
-        ApiError::timeout()
+#[derive(Debug, Clone, Copy)]
+struct Timeouts {
+    request: Duration,
+    upload: Duration,
+}
+
+async fn timeout(State(timeouts): State<Timeouts>, request: AxumRequest, next: Next) -> Response {
+    let limit = if routes::is_upload(request.method(), request.uri().path()) {
+        timeouts.upload
     } else {
-        ApiError::internal(&*err)
+        timeouts.request
+    };
+    tokio::time::timeout(limit, next.run(request))
+        .await
+        .unwrap_or_else(|_| ApiError::timeout().into_response())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NotFileContents;
+
+impl Predicate for NotFileContents {
+    fn should_compress<B: HttpBody>(&self, response: &axum::http::Response<B>) -> bool {
+        response
+            .extensions()
+            .get::<routes::FileContents>()
+            .is_none()
     }
 }
 

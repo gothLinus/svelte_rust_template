@@ -19,10 +19,15 @@ use tokio::{io::AsyncWriteExt, net::TcpListener};
 use crate::support::{TestAdapters, TestApp, TestRequest, user};
 
 fn config(pool: &PgPool) -> Config {
+    config_with(pool, &[])
+}
+
+fn config_with(pool: &PgPool, overrides: &[(&str, &str)]) -> Config {
     let base = std::env::var("DATABASE_URL").unwrap();
     let database = pool.connect_options().get_database().unwrap().to_owned();
     let (server, _) = base.rsplit_once('/').unwrap();
-    let vars: HashMap<&str, String> = [
+    let env = |name: &str| std::env::var(name).unwrap_or_default();
+    let mut vars: HashMap<&str, String> = [
         ("APP_URL", "http://localhost:5173".to_owned()),
         ("DATABASE_URL", format!("{server}/{database}")),
         ("MAIL_FROM", "App <noreply@example.com>".to_owned()),
@@ -31,9 +36,36 @@ fn config(pool: &PgPool) -> Config {
             "SECRET_KEY",
             "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=".to_owned(),
         ),
+        ("STORAGE_ENDPOINT", env("STORAGE_ENDPOINT")),
+        ("STORAGE_BUCKET", env("STORAGE_BUCKET")),
+        ("STORAGE_ACCESS_KEY", env("STORAGE_ACCESS_KEY")),
+        ("STORAGE_SECRET_KEY", env("STORAGE_SECRET_KEY")),
     ]
     .into();
+    for (name, value) in overrides {
+        vars.insert(name, (*value).to_owned());
+    }
     Config::from_lookup(|name| vars.get(name).cloned()).unwrap()
+}
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn the_object_store_is_checked_at_startup(pool: PgPool) {
+    let config = config_with(&pool, &[("STORAGE_QUOTA_PER_USER", "1000")]);
+    app::object_store(&config).await.unwrap();
+    assert_eq!(app::settings(&config).file_quota, Some(1000));
+
+    let unreachable = config_with(&pool, &[("STORAGE_ENDPOINT", "http://127.0.0.1:9")]);
+    let err = app::object_store(&unreachable).await.unwrap_err();
+    assert!(matches!(err, StartupError::ObjectStore { .. }), "{err:?}");
+    let message = err.to_string();
+    assert!(message.contains("http://127.0.0.1:9"), "{message}");
+    assert!(message.contains(&config.storage.bucket), "{message}");
+
+    let refused = config_with(&pool, &[("STORAGE_SECRET_KEY", "not-the-secret")]);
+    assert!(matches!(
+        app::object_store(&refused).await,
+        Err(StartupError::ObjectStore { .. })
+    ));
 }
 
 #[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
@@ -135,6 +167,7 @@ async fn the_maintenance_task_deletes_expired_sessions(pool: PgPool) {
         tokens: RandomTokens,
         crypto: infrastructure::crypto::RingCrypto::new(&[7; 32]),
         clock,
+        objects: infrastructure::testing::MemoryObjectStore::new(),
         mailer: Arc::new(RecordingMailer::new()),
         texts: Arc::new(infrastructure::testing::RecordingTexts::new()),
         identity_providers: Arc::new(infrastructure::testing::FakeIdentityProviders::new()),
@@ -149,6 +182,7 @@ async fn the_maintenance_task_deletes_expired_sessions(pool: PgPool) {
             links: Links::new("http://localhost:5173"),
             text_countries: Vec::new(),
             locale: domain::i18n::Locale::EN,
+            file_quota: None,
         },
     }));
 

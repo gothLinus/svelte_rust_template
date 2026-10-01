@@ -21,6 +21,7 @@ use axum::{Router, serve::ListenerExt};
 use domain::{
     database::{Database, Transaction},
     error::StorageError,
+    object_store::ObjectStoreError,
     rbac::{RbacRepository, RoleName},
     security::HashError,
     session::SessionRepository,
@@ -34,6 +35,7 @@ use infrastructure::{
     db::{self, ClusterLock, PgPool, PoolError, PostgresDatabase},
     mail::{self, InvalidSmtpUrl},
     oauth::{self, OAuthProviders},
+    object_store::{BucketStatus, S3ObjectStore},
     outbox::Outbox,
     text,
 };
@@ -69,6 +71,7 @@ impl Adapters for Production {
     type Tokens = RandomTokens;
     type Crypto = RingCrypto;
     type Clock = SystemClock;
+    type Objects = S3ObjectStore;
 }
 
 /// Everything that can stop a command from starting or finishing. `main.rs` prints it with its
@@ -95,6 +98,13 @@ pub enum StartupError {
     PasswordHasher(#[from] HashError),
     #[error("failed to set up the HTTP client for sign-in providers and texting")]
     HttpClient(#[source] oauth::HttpClientError),
+    #[error("the object store at {endpoint} (bucket `{bucket}`) is not usable")]
+    ObjectStore {
+        endpoint: String,
+        bucket: String,
+        #[source]
+        source: ObjectStoreError,
+    },
     #[error("failed to bind to {addr}")]
     Bind {
         addr: SocketAddr,
@@ -122,7 +132,31 @@ pub fn settings(config: &Config) -> Settings {
         links: Links::new(config.http.public_url.as_str()),
         text_countries: config.texts.allowed_countries.clone(),
         locale: DEFAULT_LOCALE,
+        file_quota: config.storage.quota_per_user,
     }
+}
+
+/// The object store `STORAGE_*` names, with its bucket checked (and created if missing), so wrong
+/// credentials or an unreachable store stop the server at startup like an unreachable database
+/// does, rather than failing the first upload.
+///
+/// # Errors
+///
+/// Fails if the store cannot be reached, refuses the credentials, or will not create the bucket.
+pub async fn object_store(config: &Config) -> Result<S3ObjectStore, StartupError> {
+    let failed = |source| StartupError::ObjectStore {
+        endpoint: config.storage.endpoint.to_string(),
+        bucket: config.storage.bucket.clone(),
+        source,
+    };
+    let store = S3ObjectStore::new(&config.storage).map_err(failed)?;
+    match store.ensure_bucket().await.map_err(failed)? {
+        BucketStatus::Existed => {}
+        BucketStatus::Created => {
+            tracing::info!(bucket = %config.storage.bucket, "created the object store's bucket");
+        }
+    }
+    Ok(store)
 }
 
 /// The [`RingCrypto`] keyed with `SECRET_KEY`. During a key rotation it also opens what
@@ -180,6 +214,7 @@ pub async fn serve(config: Config) -> Result<(), StartupError> {
         db::migrate(&pool).await?;
         tracing::info!("database migrations are up to date");
     }
+    let objects = object_store(&config).await?;
 
     let mail_transport = mail::transport(&config.mail)?;
     if matches!(config.mail.transport, MailTransport::Log) {
@@ -209,6 +244,7 @@ pub async fn serve(config: Config) -> Result<(), StartupError> {
         tokens: RandomTokens,
         crypto: crypto(&config),
         clock: SystemClock,
+        objects,
         mailer,
         texts,
         identity_providers: Arc::new(identity_providers),
@@ -241,6 +277,8 @@ pub async fn serve(config: Config) -> Result<(), StartupError> {
     tracing::info!("server stopped, shutting down");
 
     maintenance.abort();
+    // Work requests handed off (see `Background`), then what is due in the outbox. What the
+    // deadline cuts off stays in the outbox for the next start.
     let _aborted = maintenance.await;
     let drain_deadline = deadline.checked_sub(DB_CLOSE_TIMEOUT).unwrap_or(deadline);
     if timeout_at(drain_deadline.into(), background.drain())
@@ -272,8 +310,6 @@ async fn run_server(
     listener: TcpListener,
     app: Router,
     shutdown_timeout: Duration,
-    // Work requests handed off (see `Background`), then what is due in the outbox. What the
-    // deadline cuts off stays in the outbox for the next start.
 ) -> (io::Result<()>, Instant) {
     let (signalled, on_signal) = oneshot::channel();
     // Responses leave as soon as they are written. Compressed bodies are sent in several writes,

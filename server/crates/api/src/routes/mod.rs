@@ -18,6 +18,7 @@ use crate::state::AppState;
 
 mod admin;
 mod auth;
+mod files;
 mod health;
 mod me;
 mod mfa;
@@ -27,6 +28,8 @@ mod passkeys;
 mod passwordless;
 mod reauth;
 mod reports;
+
+pub(crate) use files::{FileContents, is_upload};
 
 pub fn api_v1<A: Adapters>() -> Router<AppState<A>> {
     Router::new()
@@ -38,6 +41,7 @@ pub fn api_v1<A: Adapters>() -> Router<AppState<A>> {
         .merge(me::routes())
         .merge(reauth::routes())
         .merge(notes::routes())
+        .merge(files::routes())
         .merge(admin::routes())
 }
 

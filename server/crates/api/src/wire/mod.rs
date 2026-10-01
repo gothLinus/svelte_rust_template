@@ -39,6 +39,7 @@ mod admin;
 mod audit;
 mod auth;
 mod common;
+mod files;
 mod mfa;
 mod notes;
 mod oauth;
