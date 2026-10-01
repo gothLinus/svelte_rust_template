@@ -32,7 +32,7 @@ COPY server/ ./
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --locked -p api --bin api
 
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
 COPY --from=builder /app/server/target/release/api /usr/local/bin/api
 COPY --from=web /app/web/build /srv/web
 ENV BIND_ADDRESS=0.0.0.0:3000 \
