@@ -30,12 +30,16 @@ tower-http = { workspace = true, features = ["catch-panic", "compression-br", "c
 # stays, so RUST_LOG can still turn it on in production.
 tracing = { workspace = true, features = ["release_max_level_debug"] }
 url.workspace = true
-tracing-subscriber = { workspace = true, features = ["ansi", "env-filter", "fmt", "json", "std"] }
+opentelemetry = { workspace = true, features = ["trace", "metrics"] }
+opentelemetry_sdk = { workspace = true, features = ["trace", "metrics"] }
+tracing-opentelemetry.workspace = true
+tracing-subscriber = { workspace = true, features = ["ansi", "env-filter", "fmt", "json", "registry", "std"] }
 # `serde`: ids in paths deserialize straight into `Uuid`.
 uuid = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 http-body-util.workspace = true
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
 infrastructure = { workspace = true, features = ["test-support"] }
 ring.workspace = true
 base64.workspace = true

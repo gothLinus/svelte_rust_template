@@ -76,7 +76,12 @@ fn run(command: Command) -> Result<(), StartupError> {
     }
 
     let config = Config::from_env()?;
-    telemetry::init(config.log_format).map_err(StartupError::Telemetry)?;
+    // Only the server is worth tracing; the one-off commands would wait for a flush at exit.
+    let otlp = match command {
+        Command::Serve => config.telemetry.otlp.as_ref(),
+        _ => None,
+    };
+    let telemetry = telemetry::init(config.log_format, otlp).map_err(StartupError::Telemetry)?;
     for warning in &config.warnings {
         tracing::warn!("{warning}");
     }
@@ -85,10 +90,14 @@ fn run(command: Command) -> Result<(), StartupError> {
         .build()
         .map_err(StartupError::Runtime)?;
 
-    match command {
+    let result = match command {
         Command::Serve => runtime.block_on(app::serve(config)),
         Command::Migrate => runtime.block_on(app::migrate(&config)),
         Command::CreateAdmin(email) => runtime.block_on(app::create_admin(&config, &email)),
         Command::Healthcheck => Ok(()),
-    }
+    };
+    // Off the runtime: the exporters' blocking HTTP clients must not be dropped on it.
+    drop(runtime);
+    telemetry.shutdown();
+    result
 }

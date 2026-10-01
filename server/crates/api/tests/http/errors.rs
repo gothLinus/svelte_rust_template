@@ -252,10 +252,19 @@ fn problem_documents_omit_empty_members() {
         instance: None,
         code: "not_found".to_owned(),
         errors: None,
+        trace_id: None,
     };
     assert_eq!(
-        serde_json::to_value(problem).unwrap(),
+        serde_json::to_value(&problem).unwrap(),
         json!({ "type": "about:blank", "title": "title", "status": 404, "code": "not_found" })
+    );
+    let traced = ProblemDetails {
+        trace_id: Some("4bf92f3577b34da6a3ce929d0e0e4736".to_owned()),
+        ..problem
+    };
+    assert_eq!(
+        serde_json::to_value(traced).unwrap()["traceId"],
+        "4bf92f3577b34da6a3ce929d0e0e4736"
     );
     let field = ProblemField {
         field: "newPassword".to_owned(),

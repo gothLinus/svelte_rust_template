@@ -709,3 +709,86 @@ fn misspelled_provider_and_twilio_variables_are_reported() {
     assert!(warnings[1].starts_with("RATE_LIMIT_LOGIN_PER_USER "));
     assert!(warnings[2].starts_with("TWILIO_SMS_FORM "));
 }
+
+#[test]
+fn otlp_export_is_off_unless_an_endpoint_is_set() {
+    let config = load(&[]).unwrap();
+    assert!(config.telemetry.otlp.is_none());
+
+    let config = load(&[
+        ("APP_NAME", "Shop"),
+        (
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "https://otel.example.com:4318/",
+        ),
+        (
+            "OTEL_EXPORTER_OTLP_HEADERS",
+            "Authorization=Bearer%20abc, x-team = ops",
+        ),
+        ("OTEL_TRACES_SAMPLER_ARG", "0.25"),
+    ])
+    .unwrap();
+    let otlp = config.telemetry.otlp.unwrap();
+    assert_eq!(
+        otlp.signal_url("traces"),
+        "https://otel.example.com:4318/v1/traces"
+    );
+    assert_eq!(otlp.service_name, "Shop");
+    assert!((otlp.sample_ratio - 0.25).abs() < f64::EPSILON);
+    let headers: Vec<(&str, &str)> = otlp
+        .headers
+        .iter()
+        .map(|(name, value)| (name.as_str(), value.expose()))
+        .collect();
+    assert_eq!(
+        headers,
+        [("authorization", "Bearer abc"), ("x-team", "ops")]
+    );
+    assert!(
+        !format!("{otlp:?}").contains("abc"),
+        "header values are secrets"
+    );
+
+    let named = load(&[
+        ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"),
+        ("OTEL_SERVICE_NAME", "api"),
+    ])
+    .unwrap();
+    let otlp = named.telemetry.otlp.unwrap();
+    assert_eq!(otlp.service_name, "api");
+    assert!((otlp.sample_ratio - 1.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn otlp_settings_are_validated() {
+    for endpoint in [
+        "localhost:4318",
+        "ftp://otel.example.com",
+        "http://otel?x=1",
+    ] {
+        assert_eq!(
+            problems(&[("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint)]),
+            ["OTEL_EXPORTER_OTLP_ENDPOINT"],
+            "{endpoint}"
+        );
+    }
+    let endpoint = ("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318");
+    for headers in ["novalue", "bad name=x", "key=%zz"] {
+        assert_eq!(
+            problems(&[endpoint, ("OTEL_EXPORTER_OTLP_HEADERS", headers)]),
+            ["OTEL_EXPORTER_OTLP_HEADERS"],
+            "{headers}"
+        );
+    }
+    for ratio in ["1.5", "-0.1", "half"] {
+        assert_eq!(
+            problems(&[endpoint, ("OTEL_TRACES_SAMPLER_ARG", ratio)]),
+            ["OTEL_TRACES_SAMPLER_ARG"],
+            "{ratio}"
+        );
+    }
+    assert_eq!(
+        problems(&[("OTEL_EXPORTER_OTLP_HEADERS", "key=value")]),
+        ["OTEL_EXPORTER_OTLP_HEADERS"]
+    );
+}
