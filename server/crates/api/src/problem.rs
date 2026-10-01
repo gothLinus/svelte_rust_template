@@ -50,6 +50,9 @@ pub struct ProblemDetails {
     pub code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub errors: Option<Vec<ProblemField>>,
+    /// The trace of the request, while traces are exported: to find it in the tracing backend.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -195,6 +198,7 @@ impl ApiError {
                     .map(|error| ProblemField::render(error, translator, locale))
                     .collect()
             }),
+            trace_id: crate::telemetry::current_trace_id(),
         }
     }
 

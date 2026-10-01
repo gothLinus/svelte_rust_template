@@ -31,7 +31,18 @@ pub type HttpClientError = reqwest::Error;
 
 pub const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 
+pub const USER_AGENT: &str = concat!("svelte-rust-template/", env!("CARGO_PKG_VERSION"));
+
 pub fn http_client() -> Result<reqwest::Client, reqwest::Error> {
+    reqwest::Client::builder()
+        .tls_backend_preconfigured(tls_config())
+        .timeout(HTTP_TIMEOUT)
+        .user_agent(USER_AGENT)
+        .build()
+}
+
+/// TLS for outgoing requests: rustls on ring with the webpki roots, the same for every client.
+pub(crate) fn tls_config() -> rustls::ClientConfig {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
@@ -39,19 +50,13 @@ pub fn http_client() -> Result<reqwest::Client, reqwest::Error> {
         clippy::expect_used,
         reason = "cannot fail: ring supports every default protocol version"
     )]
-    let tls = rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
+    rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
     .with_safe_default_protocol_versions()
     .expect("ring supports the default protocol versions")
     .with_root_certificates(roots)
-    .with_no_client_auth();
-
-    reqwest::Client::builder()
-        .tls_backend_preconfigured(tls)
-        .timeout(HTTP_TIMEOUT)
-        .user_agent(concat!("svelte-rust-template/", env!("CARGO_PKG_VERSION")))
-        .build()
+    .with_no_client_auth()
 }
 
 /// The `IdentityProviders` adapter: builds each provider's authorization URL and redeems the

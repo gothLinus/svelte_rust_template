@@ -26,6 +26,7 @@ pub use http::{HttpConfig, PublicOrigin, RateLimitStore};
 pub use mail::{MailConfig, MailTransport};
 pub use oauth::{ClientSecret, OAuthConfig, OAuthProviderConfig};
 pub use reader::parse_duration;
+pub use telemetry::{OtlpConfig, TelemetryConfig};
 pub use texts::{TextConfig, TextTransport, TwilioConfig};
 
 mod auth;
@@ -34,6 +35,7 @@ mod http;
 mod mail;
 mod oauth;
 mod reader;
+mod telemetry;
 mod texts;
 
 #[derive(Debug)]
@@ -44,6 +46,7 @@ pub struct Config {
     pub auth: AuthConfig,
     pub texts: TextConfig,
     pub oauth: OAuthConfig,
+    pub telemetry: TelemetryConfig,
     pub log_format: LogFormat,
     /// Things worth a warning at startup that do not stop it, such as a misspelled `OAUTH_*` or
     /// `TWILIO_*` variable that nothing reads.
@@ -131,6 +134,8 @@ impl Config {
         let auth = env.auth();
         let texts = env.texts();
         let oauth = env.oauth();
+        // Without an `AuthConfig` the configuration is refused anyway.
+        let telemetry = env.telemetry(auth.as_ref().map_or("", |auth| auth.app_name.as_str()));
         let log_format = env.parse("LOG_FORMAT", LogFormat::Text, |raw| match raw {
             "text" => Ok(LogFormat::Text),
             "json" => Ok(LogFormat::Json),
@@ -146,6 +151,7 @@ impl Config {
                     auth,
                     texts,
                     oauth,
+                    telemetry,
                     log_format,
                     warnings: env.warnings,
                 })

@@ -153,6 +153,15 @@ See [locales/README.md](locales/README.md). The server words everything it retur
 - GitHub Actions (`.github/workflows/ci.yml`) runs `just ci` and `just ci-extra` on every
   push to `main` and every pull request.
 
+## Observability
+
+Logs go to stderr as text or JSON (`LOG_FORMAT`, filtered by `RUST_LOG`), each request in a
+span with its `x-request-id`. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to export the same spans as
+traces and request metrics (`http.server.request.duration`, `http.server.active_requests`,
+by route template) to an OpenTelemetry collector over OTLP/HTTP. A caller's W3C
+`traceparent` is continued, and problem documents then carry a `traceId`. Without the
+endpoint nothing leaves the process.
+
 ## Deployment
 
 The `Dockerfile` builds the SPA, compiles the API with `SQLX_OFFLINE=true` and ships both

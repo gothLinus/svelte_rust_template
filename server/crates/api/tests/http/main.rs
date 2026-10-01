@@ -27,3 +27,4 @@ mod sign_in;
 mod spa;
 mod startup;
 mod support;
+mod telemetry;

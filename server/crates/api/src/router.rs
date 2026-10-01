@@ -2,7 +2,8 @@
 //!
 //! [`build`] layers it in three tiers, outermost first:
 //!
-//! 1. Every response: request id, security headers, tracing, compression, the language of problem documents (`middleware::localize`), timeout
+//! 1. Every response: request id, security headers, tracing and request metrics, compression, the
+//!    language of problem documents (`middleware::localize`), timeout
 //!    (`REQUEST_TIMEOUT`) and panic handling (both answer
 //!    with a problem document) and the body size limit.
 //! 2. The `/api/v1` group: CORS (only when origins are configured), `Cache-Control: no-store`, the
@@ -43,13 +44,16 @@ use tracing::Span;
 use crate::{
     middleware::{
         csrf::{self, TrustedOrigins, X_REQUESTED_WITH},
-        localize, rate_limit,
+        localize,
+        metrics::{self, HttpMetrics},
+        rate_limit,
         security_headers::{self, SecurityHeaders},
         session,
     },
     problem::ApiError,
     routes, spa,
     state::AppState,
+    telemetry,
 };
 
 /// For responses compressed as they are sent: API bodies and whatever the build did not
@@ -129,6 +133,10 @@ pub fn with_middleware(
                 security_headers::apply,
             ))
             .layer(TraceLayer::new_for_http().make_span_with(request_span))
+            .layer(from_fn_with_state(
+                HttpMetrics::new(&opentelemetry::global::meter(telemetry::SCOPE)),
+                metrics::record,
+            ))
             .layer(
                 CompressionLayer::new()
                     .quality(COMPRESSION_LEVEL)
@@ -182,12 +190,14 @@ fn request_span(request: &Request<Body>) -> Span {
         .and_then(|id| id.header_value().to_str().ok())
         .unwrap_or_default();
 
-    tracing::info_span!(
+    let span = tracing::info_span!(
         "request",
         method = %request.method(),
         path = %request.uri().path(),
         request_id,
-    )
+    );
+    telemetry::continue_trace(&span, request.headers());
+    span
 }
 
 async fn middleware_error(err: BoxError) -> ApiError {

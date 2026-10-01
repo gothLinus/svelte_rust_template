@@ -28,6 +28,9 @@ getrandom = "0.4.3"
 http-body-util = "0.1.5"
 lettre = { version = "0.11.23", default-features = false }
 mimalloc = { version = "0.1.52", default-features = false }
+opentelemetry = { version = "0.33.0", default-features = false }
+opentelemetry-otlp = { version = "0.33.0", default-features = false }
+opentelemetry_sdk = { version = "0.33.0", default-features = false }
 prost = "0.14.4"
 prost-build = "0.14.4"
 prost-reflect = "0.16.5"
@@ -46,6 +49,7 @@ tokio = "1.53.1"
 tower = "0.5.3"
 tower-http = "0.7.1"
 tracing = "0.1.44"
+tracing-opentelemetry = { version = "0.34.0", default-features = false }
 tracing-subscriber = { version = "0.3.23", default-features = false }
 unic-langid = "0.9.6"
 url = "2"
