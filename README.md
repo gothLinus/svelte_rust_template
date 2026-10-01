@@ -145,6 +145,8 @@ See [locales/README.md](locales/README.md). The server words everything it retur
   migrated database, and the `api` tests drive the real router.
 - The web app uses Vitest for the client, guards, forms and route loads. There are no
   browser end-to-end tests.
+- GitHub Actions (`.github/workflows/ci.yml`) runs `just ci` and `just ci-extra` on every
+  push to `main` and every pull request.
 
 ## Deployment
 
