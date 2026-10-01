@@ -8,7 +8,13 @@
 //! app. To fake another port for a test, add its fake here in the same shape rather than in each
 //! test crate.
 
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::{
+    collections::BTreeMap,
+    future::{Future, ready},
+    sync::{Arc, Mutex, MutexGuard, PoisonError},
+};
+
+use bytes::{Bytes, BytesMut};
 
 use domain::{
     clock::{Clock, truncate_to_micros},
@@ -17,10 +23,13 @@ use domain::{
         ProviderProfile,
     },
     mail::{Mail, MailFuture, Mailer},
+    object_store::{ByteStream, NewObject, Object, ObjectKey, ObjectStore, ObjectStoreError},
     one_time_code::CodeChannel,
     secret::Secret,
     text::{TextFuture, TextMessage, TextSender},
 };
+use futures_util::{StreamExt, stream};
+use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 
 #[derive(Debug, Clone)]
@@ -210,6 +219,100 @@ impl IdentityProviders for FakeIdentityProviders {
                 .map(|(_, profile)| profile.clone())
                 .ok_or_else(|| OAuthError::Rejected("unknown code".to_owned()))
         })
+    }
+}
+
+const CHUNK: usize = 16 * 1024;
+
+#[derive(Debug, Error)]
+#[error("the object store is down")]
+struct StoreDown;
+
+#[derive(Debug, Error)]
+#[error("the body was {0} bytes, not the announced {1}")]
+struct WrongLength(u64, u64);
+
+/// An object store in memory: objects by key, with their content type.
+///
+/// Like the S3 adapter, [`ObjectStore::put`] reads the body to its end and fails with
+/// [`ObjectStoreError::Body`] if it breaks or has another length than announced, storing nothing.
+/// [`MemoryObjectStore::set_down`] makes every call fail, to test what the application does when
+/// the store is unreachable.
+#[derive(Debug, Clone, Default)]
+pub struct MemoryObjectStore {
+    objects: Arc<Mutex<BTreeMap<ObjectKey, (String, Bytes)>>>,
+    down: Arc<Mutex<bool>>,
+}
+
+impl MemoryObjectStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_down(&self, down: bool) {
+        *lock(&self.down) = down;
+    }
+
+    pub fn keys(&self) -> Vec<ObjectKey> {
+        lock(&self.objects).keys().cloned().collect()
+    }
+
+    pub fn object(&self, key: &ObjectKey) -> Option<(String, Bytes)> {
+        lock(&self.objects).get(key).cloned()
+    }
+
+    pub fn insert(&self, key: ObjectKey, content_type: &str, contents: impl Into<Bytes>) {
+        lock(&self.objects).insert(key, (content_type.to_owned(), contents.into()));
+    }
+
+    fn check_up(&self) -> Result<(), ObjectStoreError> {
+        if *lock(&self.down) {
+            Err(ObjectStoreError::backend(StoreDown))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl ObjectStore for MemoryObjectStore {
+    async fn put(&self, key: &ObjectKey, object: NewObject) -> Result<(), ObjectStoreError> {
+        self.check_up()?;
+        let mut body = object.body;
+        let mut contents = BytesMut::new();
+        while let Some(chunk) = body.next().await {
+            contents.extend_from_slice(&chunk?);
+        }
+        let length = u64::try_from(contents.len()).unwrap_or(u64::MAX);
+        if length != object.length {
+            return Err(ObjectStoreError::body(WrongLength(length, object.length)));
+        }
+        self.check_up()?;
+        lock(&self.objects).insert(key.clone(), (object.content_type, contents.freeze()));
+        Ok(())
+    }
+
+    fn get(
+        &self,
+        key: &ObjectKey,
+    ) -> impl Future<Output = Result<Option<Object>, ObjectStoreError>> + Send {
+        let object = self.check_up().map(|()| {
+            lock(&self.objects).get(key).cloned().map(|(_, contents)| {
+                let length = u64::try_from(contents.len()).unwrap_or(u64::MAX);
+                let chunks: Vec<Result<Bytes, ObjectStoreError>> = (0..contents.len())
+                    .step_by(CHUNK)
+                    .map(|start| Ok(contents.slice(start..contents.len().min(start + CHUNK))))
+                    .collect();
+                let body: ByteStream = Box::pin(stream::iter(chunks));
+                Object { length, body }
+            })
+        });
+        ready(object)
+    }
+
+    fn delete(&self, key: &ObjectKey) -> impl Future<Output = Result<(), ObjectStoreError>> + Send {
+        ready(self.check_up().map(|()| {
+            lock(&self.objects).remove(key);
+        }))
     }
 }
 

@@ -37,6 +37,8 @@ pub(super) const RATE_VARS: &[&str] = &[
     "RATE_LIMIT_CHECK_CODE_PER_ACCOUNT",
     "RATE_LIMIT_CEREMONY_PER_IP",
     "RATE_LIMIT_REPORT_PER_IP",
+    "RATE_LIMIT_UPLOAD_PER_IP",
+    "RATE_LIMIT_UPLOAD_PER_ACCOUNT",
     "RATE_LIMIT_STORE",
     "RATE_LIMIT_MEMORY_MAX_KEYS",
 ];
@@ -71,6 +73,9 @@ pub struct HttpConfig {
     /// CORS headers at all: the SPA is served same-origin.
     pub cors_origins: Vec<PublicOrigin>,
     pub request_timeout: Duration,
+    /// How long a file upload may take (`UPLOAD_TIMEOUT`), instead of `request_timeout`: its body
+    /// is the file.
+    pub upload_timeout: Duration,
     pub max_body_bytes: usize,
     pub rate_limits: bool,
     pub rates: Rates,
@@ -139,7 +144,7 @@ impl Reader<'_> {
         if rate_limit_memory_max_keys == 0 {
             self.problem("RATE_LIMIT_MEMORY_MAX_KEYS", "must be greater than zero");
         }
-        let rates = self.rates();
+        let (rates, upload_timeout) = (self.rates(), self.upload_timeout());
         let shutdown_timeout = self.duration(
             "SHUTDOWN_TIMEOUT",
             Duration::from_secs(20),
@@ -182,6 +187,7 @@ impl Reader<'_> {
             hsts_max_age,
             cors_origins,
             request_timeout,
+            upload_timeout,
             max_body_bytes,
             rate_limits,
             rates,
@@ -193,6 +199,20 @@ impl Reader<'_> {
 }
 
 impl Reader<'_> {
+    /// At most an hour: an unfinished upload's contents are removed some hours later
+    /// (`application::files::UNFINISHED_UPLOAD_TTL`), which must not catch a live one.
+    fn upload_timeout(&mut self) -> Duration {
+        let timeout = self.duration(
+            "UPLOAD_TIMEOUT",
+            Duration::from_mins(10),
+            Duration::from_hours(1),
+        );
+        if timeout.is_zero() {
+            self.problem("UPLOAD_TIMEOUT", "must be greater than zero");
+        }
+        timeout
+    }
+
     fn rates(&mut self) -> Rates {
         let default = Rates::default();
         Rates {
@@ -238,6 +258,9 @@ impl Reader<'_> {
             ),
             ceremony_per_ip: self.rate("RATE_LIMIT_CEREMONY_PER_IP", default.ceremony_per_ip),
             report_per_ip: self.rate("RATE_LIMIT_REPORT_PER_IP", default.report_per_ip),
+            upload_per_ip: self.rate("RATE_LIMIT_UPLOAD_PER_IP", default.upload_per_ip),
+            upload_per_account: self
+                .rate("RATE_LIMIT_UPLOAD_PER_ACCOUNT", default.upload_per_account),
         }
     }
 

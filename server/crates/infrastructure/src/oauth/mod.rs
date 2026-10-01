@@ -41,7 +41,7 @@ pub fn http_client() -> Result<reqwest::Client, reqwest::Error> {
         .build()
 }
 
-/// TLS for outgoing requests: rustls on ring with the webpki roots, the same for every client.
+/// TLS for outgoing requests: rustls on ring (providers, Twilio, telemetry, the object store) with the webpki roots, the same for every client.
 pub(crate) fn tls_config() -> rustls::ClientConfig {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),

@@ -26,6 +26,7 @@ pub use http::{HttpConfig, PublicOrigin, RateLimitStore};
 pub use mail::{MailConfig, MailTransport};
 pub use oauth::{ClientSecret, OAuthConfig, OAuthProviderConfig};
 pub use reader::parse_duration;
+pub use storage::{DEFAULT_QUOTA_PER_USER, StorageConfig};
 pub use telemetry::{OtlpConfig, TelemetryConfig};
 pub use texts::{TextConfig, TextTransport, TwilioConfig};
 
@@ -35,6 +36,7 @@ mod http;
 mod mail;
 mod oauth;
 mod reader;
+mod storage;
 mod telemetry;
 mod texts;
 
@@ -47,6 +49,7 @@ pub struct Config {
     pub texts: TextConfig,
     pub oauth: OAuthConfig,
     pub telemetry: TelemetryConfig,
+    pub storage: StorageConfig,
     pub log_format: LogFormat,
     /// Things worth a warning at startup that do not stop it, such as a misspelled `OAUTH_*` or
     /// `TWILIO_*` variable that nothing reads.
@@ -136,14 +139,17 @@ impl Config {
         let oauth = env.oauth();
         // Without an `AuthConfig` the configuration is refused anyway.
         let telemetry = env.telemetry(auth.as_ref().map_or("", |auth| auth.app_name.as_str()));
+        let storage = env.storage();
         let log_format = env.parse("LOG_FORMAT", LogFormat::Text, |raw| match raw {
             "text" => Ok(LogFormat::Text),
             "json" => Ok(LogFormat::Json),
             _ => Err("must be `text` or `json`".to_owned()),
         });
 
-        match (http, database, mail, auth) {
-            (Some(http), Some(database), Some(mail), Some(auth)) if env.problems.is_empty() => {
+        match (http, database, mail, auth, storage) {
+            (Some(http), Some(database), Some(mail), Some(auth), Some(storage))
+                if env.problems.is_empty() =>
+            {
                 Ok(Self {
                     http,
                     database,
@@ -152,6 +158,7 @@ impl Config {
                     texts,
                     oauth,
                     telemetry,
+                    storage,
                     log_format,
                     warnings: env.warnings,
                 })
@@ -172,6 +179,7 @@ pub fn unknown_variables(names: impl IntoIterator<Item = String>) -> Vec<String>
                 || (name.starts_with("RATE_LIMIT_") && !http::RATE_VARS.contains(&name.as_str()))
                 || ((name.starts_with("TWILIO_") || name.starts_with("TEXT_"))
                     && !texts::TEXT_VARS.contains(&name.as_str()))
+                || (name.starts_with("STORAGE_") && !storage::STORAGE_VARS.contains(&name.as_str()))
         })
         .collect();
     unknown.sort();

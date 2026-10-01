@@ -90,6 +90,10 @@ pub struct Rates {
     /// Content Security Policy violation reports: a page reports each violation once, so an honest
     /// client stays far below this.
     pub report_per_ip: Rate,
+    /// File uploads. Each may be large, so they are counted apart from the API's limit; what a user
+    /// keeps is bounded by their quota instead.
+    pub upload_per_ip: Rate,
+    pub upload_per_account: Rate,
 }
 
 impl Default for Rates {
@@ -112,6 +116,8 @@ impl Default for Rates {
             check_code_per_account: Rate::new(nz(10), HOUR),
             ceremony_per_ip: Rate::new(nz(60), MINUTE),
             report_per_ip: Rate::new(nz(30), MINUTE),
+            upload_per_ip: Rate::new(nz(120), HOUR),
+            upload_per_account: Rate::new(nz(60), HOUR),
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "infrastructure"
-description = "Adapters for the domain ports: PostgreSQL (sqlx), Argon2id, OS randomness, SMTP (lettre) and configuration."
+description = "Adapters for the domain ports: PostgreSQL (sqlx), Argon2id, OS randomness, SMTP (lettre), S3 object storage and configuration."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,14 +13,17 @@ test-support = []
 [dependencies]
 argon2.workspace = true
 base64.workspace = true
+bytes.workspace = true
 domain.workspace = true
 dotenvy.workspace = true
+futures-core.workspace = true
+futures-util.workspace = true
 getrandom.workspace = true
 opentelemetry = { workspace = true, features = ["trace", "metrics"] }
 opentelemetry-otlp = { workspace = true, features = ["http-proto", "reqwest-blocking-client", "trace", "metrics"] }
 opentelemetry_sdk = { workspace = true, features = ["trace", "metrics"] }
 lettre = { workspace = true, features = ["builder", "hostname", "pool", "smtp-transport", "tokio1-rustls", "ring", "webpki-roots", "tracing"] }
-reqwest = { workspace = true, features = ["blocking", "json", "form", "rustls-no-provider"] }
+reqwest = { workspace = true, features = ["blocking", "json", "form", "rustls-no-provider", "stream"] }
 ring.workspace = true
 rustls = { workspace = true, features = ["ring", "std", "tls12"] }
 serde = { workspace = true, features = ["derive"] }

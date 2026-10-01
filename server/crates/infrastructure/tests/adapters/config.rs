@@ -2,8 +2,8 @@ use std::{collections::HashMap, time::Duration};
 
 use infrastructure::{
     config::{
-        ClientSecret, Config, ConfigError, LogFormat, MailTransport, PublicOrigin, RateLimitStore,
-        SecretKey, TextTransport, parse_duration, unknown_variables,
+        ClientSecret, Config, ConfigError, DEFAULT_QUOTA_PER_USER, LogFormat, MailTransport,
+        PublicOrigin, RateLimitStore, SecretKey, TextTransport, parse_duration, unknown_variables,
     },
     oauth::Provider,
 };
@@ -16,6 +16,13 @@ const MINIMAL: &[(&str, &str)] = &[
     ("DATABASE_URL", "postgres://app:app@localhost:5432/app"),
     ("MAIL_FROM", "Example <noreply@example.com>"),
     ("SECRET_KEY", KEY),
+    ("STORAGE_ENDPOINT", "http://localhost:9000"),
+    ("STORAGE_BUCKET", "app"),
+    ("STORAGE_ACCESS_KEY", "app"),
+    (
+        "STORAGE_SECRET_KEY",
+        "0123456789abcdef0123456789abcdef01234567",
+    ),
 ];
 
 fn load(vars: &[(&str, &str)]) -> Result<Config, ConfigError> {
@@ -687,6 +694,104 @@ fn text_countries_are_calling_codes() {
 }
 
 #[test]
+fn storage_defaults_and_overrides() {
+    let config = load(&[]).unwrap();
+    assert_eq!(config.storage.endpoint.as_str(), "http://localhost:9000");
+    assert_eq!(config.storage.bucket, "app");
+    assert_eq!(config.storage.region, "us-east-1");
+    assert_eq!(config.storage.access_key, "app");
+    assert_eq!(config.storage.quota_per_user, Some(DEFAULT_QUOTA_PER_USER));
+    assert_eq!(config.http.upload_timeout, Duration::from_mins(10));
+    assert!(!format!("{:?}", config.storage).contains("0123456789abcdef"));
+
+    let config = load(&[
+        ("STORAGE_ENDPOINT", "https://s3.eu-central-1.amazonaws.com/"),
+        ("STORAGE_BUCKET", "acme.files-1"),
+        ("STORAGE_REGION", "eu-central-1"),
+        ("STORAGE_QUOTA_PER_USER", "0"),
+        ("UPLOAD_TIMEOUT", "1h"),
+    ])
+    .unwrap();
+    assert_eq!(
+        config.storage.endpoint.as_str(),
+        "https://s3.eu-central-1.amazonaws.com"
+    );
+    assert_eq!(config.storage.bucket, "acme.files-1");
+    assert_eq!(config.storage.region, "eu-central-1");
+    assert_eq!(config.storage.quota_per_user, None);
+    assert_eq!(config.http.upload_timeout, Duration::from_hours(1));
+}
+
+#[test]
+fn storage_problems_name_the_variable() {
+    let missing: Vec<(&str, &str)> = [
+        "STORAGE_ENDPOINT",
+        "STORAGE_BUCKET",
+        "STORAGE_ACCESS_KEY",
+        "STORAGE_SECRET_KEY",
+    ]
+    .map(|name| (name, ""))
+    .to_vec();
+    assert_eq!(
+        problems(&missing),
+        [
+            "STORAGE_ENDPOINT",
+            "STORAGE_BUCKET",
+            "STORAGE_ACCESS_KEY",
+            "STORAGE_SECRET_KEY"
+        ]
+    );
+    for (name, value) in [
+        ("STORAGE_ENDPOINT", "localhost:9000"),
+        ("STORAGE_ENDPOINT", "http://localhost:9000/bucket"),
+        ("STORAGE_BUCKET", "ab"),
+        ("STORAGE_BUCKET", "Uppercase"),
+        ("STORAGE_BUCKET", "-starts-with-a-dash"),
+        ("STORAGE_BUCKET", "two..dots"),
+        ("STORAGE_REGION", "EU Central"),
+        ("STORAGE_QUOTA_PER_USER", "1 GiB"),
+        ("UPLOAD_TIMEOUT", "0"),
+        ("UPLOAD_TIMEOUT", "2h"),
+    ] {
+        assert_eq!(problems(&[(name, value)]), [name], "{name}={value}");
+    }
+}
+
+#[test]
+fn off_localhost_the_store_needs_its_own_credentials() {
+    assert!(deployed(&[]).is_ok());
+    assert_eq!(
+        deployed_problems(&[
+            ("STORAGE_ACCESS_KEY", "rustfsadmin"),
+            ("STORAGE_SECRET_KEY", "rustfsadmin"),
+        ]),
+        ["STORAGE_ACCESS_KEY", "STORAGE_SECRET_KEY"]
+    );
+    assert_eq!(
+        deployed_problems(&[("STORAGE_SECRET_KEY", "minioadmin")]),
+        ["STORAGE_SECRET_KEY"]
+    );
+    assert!(
+        load(&[
+            ("STORAGE_ACCESS_KEY", "rustfsadmin"),
+            ("STORAGE_SECRET_KEY", "rustfsadmin"),
+        ])
+        .is_ok()
+    );
+
+    // Plain http to a store elsewhere works, with a warning.
+    let config = deployed(&[("STORAGE_ENDPOINT", "http://rustfs:9000")]).unwrap();
+    assert_eq!(config.warnings.len(), 1, "{:?}", config.warnings);
+    assert!(config.warnings[0].starts_with("STORAGE_ENDPOINT is plain http://"));
+    assert!(
+        deployed(&[("STORAGE_ENDPOINT", "https://s3.example.com")])
+            .unwrap()
+            .warnings
+            .is_empty()
+    );
+}
+
+#[test]
 fn misspelled_provider_and_twilio_variables_are_reported() {
     let warnings = unknown_variables(
         [
@@ -700,14 +805,18 @@ fn misspelled_provider_and_twilio_variables_are_reported() {
             "RATE_LIMIT_LOGIN_PER_USER",
             "RATE_LIMIT_STORE",
             "RATE_LIMITS_ENABLED",
+            "RATE_LIMIT_UPLOAD_PER_ACCOUNT",
+            "STORAGE_BUCKET",
+            "STORAGE_SECRET",
             "PATH",
         ]
         .map(str::to_owned),
     );
-    assert_eq!(warnings.len(), 3, "{warnings:?}");
+    assert_eq!(warnings.len(), 4, "{warnings:?}");
     assert!(warnings[0].starts_with("OAUTH_GOOGLE_CLIENTID "));
     assert!(warnings[1].starts_with("RATE_LIMIT_LOGIN_PER_USER "));
-    assert!(warnings[2].starts_with("TWILIO_SMS_FORM "));
+    assert!(warnings[2].starts_with("STORAGE_SECRET "));
+    assert!(warnings[3].starts_with("TWILIO_SMS_FORM "));
 }
 
 #[test]

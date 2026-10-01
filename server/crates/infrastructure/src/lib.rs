@@ -11,6 +11,7 @@ pub mod crypto;
 pub mod db;
 pub mod mail;
 pub mod oauth;
+pub mod object_store;
 pub mod outbox;
 pub mod rate_limit;
 pub mod telemetry;

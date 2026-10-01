@@ -7,9 +7,11 @@
 //! guarded `update`) instead of read-then-write, so concurrent requests cannot both succeed.
 
 mod audit;
+mod files;
 mod identities;
 mod mfa;
 mod notes;
+mod object_deletions;
 mod one_time_codes;
 mod passkeys;
 mod rbac;

@@ -4,6 +4,7 @@
 )]
 
 mod audit;
+mod files;
 mod notes;
 mod outbox;
 mod pool;

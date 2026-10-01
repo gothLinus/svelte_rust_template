@@ -9,6 +9,7 @@ mod mail;
 mod profiles;
 mod rate_limits;
 mod sign_in;
+mod signing;
 mod smtp;
 mod telemetry;
 mod testing;
