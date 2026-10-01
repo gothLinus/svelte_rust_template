@@ -40,6 +40,8 @@ message User {
   bool disabled = 8;
   repeated string roles = 9;
   google.protobuf.Timestamp created_at = 10;
+  // The language chosen for mail and texts (`de`); absent leaves it to the server.
+  optional string locale = 11;
 }
 
 message Me {

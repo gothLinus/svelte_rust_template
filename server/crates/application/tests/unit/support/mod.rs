@@ -125,7 +125,7 @@ impl Fixture {
         match self
             .services
             .auth
-            .register(register_request(email), ClientInfo::default())
+            .register(register_request(email), ClientInfo::default(), None)
             .await
             .unwrap()
         {

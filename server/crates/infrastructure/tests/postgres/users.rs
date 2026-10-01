@@ -245,3 +245,57 @@ async fn unverified_accounts_past_the_cutoff_are_deleted_admins_never(pool: PgPo
     assert!(conn.find_user(verified.id()).await.unwrap().is_some());
     assert!(conn.find_user(admin.id()).await.unwrap().is_some());
 }
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn the_language_is_stored_and_read_back_everywhere(pool: PgPool) {
+    use domain::{
+        i18n::Locale,
+        secret::TokenHash,
+        session::{ClientInfo, Session, SessionPolicy, SessionRepository},
+    };
+
+    let mut conn = conn(&pool).await;
+    let alice = conn
+        .create_user(&NewUser {
+            locale: Locale::parse("de"),
+            ..new_user("alice@example.com")
+        })
+        .await
+        .unwrap();
+    assert_eq!(alice.locale().map(Locale::as_str), Some("de"));
+
+    let cleared = conn
+        .set_user_locale(alice.id(), None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(cleared.locale().is_none());
+    let brazilian = Locale::parse("pt-BR").unwrap();
+    conn.set_user_locale(alice.id(), Some(&brazilian))
+        .await
+        .unwrap();
+    let found = conn.find_user(alice.id()).await.unwrap().unwrap();
+    assert_eq!(found.locale(), Some(&brazilian));
+
+    let session = Session::start(
+        alice.id(),
+        TokenHash::new([4; 32]),
+        ClientInfo::default(),
+        time::OffsetDateTime::now_utc(),
+        &SessionPolicy::default(),
+    );
+    conn.create_session(&session).await.unwrap();
+    let authenticated = conn
+        .find_session_by_token(&TokenHash::new([4; 32]))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(authenticated.user.locale(), Some(&brazilian));
+
+    assert!(
+        conn.set_user_locale(domain::user::UserId::generate(), None)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}

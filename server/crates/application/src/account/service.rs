@@ -5,7 +5,7 @@ use domain::{
     clock::Clock,
     database::{Database, Transaction},
     error::ValidationError,
-    i18n::Message,
+    i18n::{Locale, Message},
     identity::IdentityRepository,
     mfa::MfaRepository,
     one_time_code::{CODE_TTL, CodeChannel, CodePurpose},
@@ -25,7 +25,7 @@ use crate::{
     account::{
         dto::{
             AddPhoneRequest, ChangeEmailRequest, DeleteAccountRequest, ProfileChange, SecurityDto,
-            UpdateProfileRequest,
+            SetLocaleRequest, UpdateProfileRequest,
         },
         load_me,
     },
@@ -88,6 +88,40 @@ impl<A: Adapters> AccountService<A> {
         Ok(me)
     }
 
+    /// Sets the language mail and texts to the actor are written in.
+    ///
+    /// # Errors
+    ///
+    /// `Validation` on `locale` (`unsupported_locale`) for a language the catalog does not have.
+    pub async fn set_locale(
+        &self,
+        actor: &Actor,
+        request: SetLocaleRequest,
+    ) -> Result<MeDto, AppError> {
+        let locale = match request.locale.as_deref().map(str::trim) {
+            None | Some("") => None,
+            Some(tag) => Some(
+                Locale::parse(tag)
+                    .filter(|locale| self.ctx.translator.locales().contains(locale))
+                    .ok_or_else(|| {
+                        AppError::invalid(
+                            "locale",
+                            &ValidationError::new(
+                                "unsupported_locale",
+                                Message::new("validation-locale-unsupported"),
+                            ),
+                        )
+                    })?,
+            ),
+        };
+        let mut conn = self.ctx.db.connection().await?;
+        let user = conn
+            .set_user_locale(actor.user_id, locale.as_ref())
+            .await?
+            .ok_or(AppError::Unauthenticated)?;
+        Ok(load_me(&mut conn, &user).await?)
+    }
+
     /// Mails a link to the new address; the change happens when it is opened
     /// ([`AuthService::confirm_email_change`](crate::auth::AuthService::confirm_email_change)). The
     /// current address gets a notice with a link that cancels the change and signs out every
@@ -148,7 +182,7 @@ impl<A: Adapters> AccountService<A> {
         mail::send(
             &*self.ctx.mailer,
             mail::confirm_email_change(
-                &self.ctx.voice(),
+                &self.ctx.voice_for(&user),
                 email.clone(),
                 &links.confirm_email(&token),
                 ttl,
@@ -159,7 +193,7 @@ impl<A: Adapters> AccountService<A> {
         mail::send(
             &*self.ctx.mailer,
             mail::email_change_requested(
-                &self.ctx.voice(),
+                &self.ctx.voice_for(&user),
                 user.email().clone(),
                 &email.masked(),
                 &links.cancel_email_change(&cancel),
@@ -193,7 +227,7 @@ impl<A: Adapters> AccountService<A> {
         let ttl = self.ctx.settings.tokens.password_reset_ttl;
         mail::send(
             &*self.ctx.mailer,
-            mail::password_reset(&self.ctx.voice(), user.email().clone(), &link, ttl),
+            mail::password_reset(&self.ctx.voice_for(&user), user.email().clone(), &link, ttl),
         )
         .await;
         tracing::info!(user_id = %user.id(), "password change link sent");
@@ -231,6 +265,10 @@ impl<A: Adapters> AccountService<A> {
         {
             return Err(phone_taken());
         }
+        let user = conn
+            .find_user(actor.user_id)
+            .await?
+            .ok_or(AppError::Unauthenticated)?;
         let code = codes::issue(
             &self.ctx,
             &mut conn,
@@ -246,7 +284,7 @@ impl<A: Adapters> AccountService<A> {
             .arg("code", group(code.expose()))
             .arg("app", self.ctx.settings.app_name.as_str())
             .arg("minutes", CODE_TTL.whole_minutes());
-        send_text(&self.ctx, phone, channel, &message).await;
+        send_text(&self.ctx, &user, phone, channel, &message).await;
         Ok(())
     }
 

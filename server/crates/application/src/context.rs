@@ -20,7 +20,7 @@ use domain::{
     security::{Crypto, PasswordHasher, TokenGenerator},
     session::{ClientInfo, SessionPolicy, SessionRepository},
     text::TextSender,
-    user::{UserId, UserRepository},
+    user::{User, UserId, UserRepository},
     user_token::{TokenPolicy, UserTokenRepository},
 };
 
@@ -95,8 +95,8 @@ pub struct Settings {
     /// Country calling codes phone numbers must start with to be texted. Empty allows every
     /// country.
     pub text_countries: Vec<domain::user::CallingCode>,
-    /// The language of mail and texts. Users have no language of their own yet, so every mail is
-    /// written in this one; API errors follow the request's `Accept-Language` instead.
+    /// The language of mail and texts to users who chose none, and to addresses with no account
+    /// behind them. API errors follow the request's `Accept-Language` instead.
     pub locale: Locale,
 }
 
@@ -141,12 +141,19 @@ pub struct Context<A: Adapters> {
 }
 
 impl<A: Adapters> Context<A> {
+    /// Words mail and texts in the default language, for a recipient without an account.
     pub(crate) fn voice(&self) -> Voice<'_> {
         Voice::new(&*self.translator, &self.settings.locale)
     }
 
-    pub(crate) fn say(&self, message: &Message) -> String {
-        self.voice().say(message)
+    /// Words mail and texts in `user`'s language, or the default one if they have none, or one the
+    /// catalog no longer has.
+    pub(crate) fn voice_for<'a>(&'a self, user: &'a User) -> Voice<'a> {
+        let locale = user
+            .locale()
+            .filter(|locale| self.translator.locales().contains(locale))
+            .unwrap_or(&self.settings.locale);
+        Voice::new(&*self.translator, locale)
     }
 
     /// An audit event about `user`, happening now, from `client`.

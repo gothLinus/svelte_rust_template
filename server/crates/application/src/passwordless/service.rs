@@ -76,7 +76,7 @@ impl<A: Adapters> PasswordlessService<A> {
         mail::send(
             &*self.ctx.mailer,
             mail::sign_in_code(
-                &self.ctx.voice(),
+                &self.ctx.voice_for(&user),
                 user.email().clone(),
                 &link,
                 &group(code.expose()),
@@ -212,7 +212,7 @@ impl<A: Adapters> PasswordlessService<A> {
             .arg("code", group(code.expose()))
             .arg("app", self.ctx.settings.app_name.as_str())
             .arg("minutes", CODE_TTL.whole_minutes());
-        send_text(&self.ctx, phone, channel, &message).await;
+        send_text(&self.ctx, &user, phone, channel, &message).await;
         tracing::info!(user_id = %user.id(), %channel, "sign-in code texted");
         Ok(())
     }
@@ -298,8 +298,10 @@ pub(crate) fn group(code: &str) -> String {
     }
 }
 
+/// Texts `text` to `to`, in `user`'s language.
 pub(crate) async fn send_text<A: Adapters>(
     ctx: &Context<A>,
+    user: &User,
     to: PhoneNumber,
     channel: CodeChannel,
     text: &Message,
@@ -308,7 +310,7 @@ pub(crate) async fn send_text<A: Adapters>(
     let message = TextMessage {
         to,
         channel,
-        body: ctx.say(text),
+        body: ctx.voice_for(user).say(text),
         valid_for: CODE_TTL,
     };
     if let Err(err) = ctx.texts.send(message).await {

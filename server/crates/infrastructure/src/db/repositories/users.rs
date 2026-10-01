@@ -6,7 +6,8 @@
 //! lookup, which joins the user in.
 
 use domain::{
-    error::StorageError,
+    error::{StorageError, UnknownValue},
+    i18n::Locale,
     pagination::{Cursor, Page, PageRequest},
     user::{
         Email, NewUser, PasswordHash, PhoneNumber, User, UserFilter, UserId, UserParts,
@@ -31,6 +32,7 @@ pub(super) struct UserRow {
     pub password_hash: Option<String>,
     pub email_verified_at: Option<OffsetDateTime>,
     pub disabled_at: Option<OffsetDateTime>,
+    pub locale: Option<String>,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
@@ -53,6 +55,11 @@ impl TryFrom<UserRow> for User {
             password_hash: row.password_hash.map(PasswordHash::new),
             email_verified_at: row.email_verified_at,
             disabled_at: row.disabled_at,
+            locale: row
+                .locale
+                .map(|tag| Locale::parse(&tag).ok_or_else(|| UnknownValue::new("language", tag)))
+                .transpose()
+                .map_err(corrupt)?,
             created_at: row.created_at,
             updated_at: row.updated_at,
         }))
@@ -64,16 +71,17 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
         sqlx::query_as!(
             UserRow,
             r#"
-            insert into users (id, email, username, password_hash, email_verified_at)
-            values ($1, $2, $3, $4, $5)
+            insert into users (id, email, username, password_hash, email_verified_at, locale)
+            values ($1, $2, $3, $4, $5, $6)
             returning id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             "#,
             user.id.as_uuid(),
             user.email.as_str(),
             user.username.as_str(),
             user.password_hash.as_ref().map(PasswordHash::as_str),
             user.email_verified_at,
+            user.locale.as_ref().map(Locale::as_str),
         )
         .fetch_one(self.conn())
         .await
@@ -86,7 +94,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             UserRow,
             r#"
             select id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             from users
             where id = $1
             "#,
@@ -105,7 +113,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             UserRow,
             r#"
             select id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             from users
             where id = any($1)
             "#,
@@ -124,7 +132,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             UserRow,
             r#"
             select id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             from users
             where id = $1
             for update
@@ -143,7 +151,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             UserRow,
             r#"
             select id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             from users
             where lower(email) = lower($1)
             "#,
@@ -164,7 +172,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             UserRow,
             r#"
             select id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             from users
             where lower(username) = lower($1)
             "#,
@@ -185,7 +193,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             UserRow,
             r#"
             select id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             from users
             where phone = $1
             "#,
@@ -216,7 +224,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
                     UserRow,
                     r#"
                     select id, email, username, phone, phone_verified_at, password_hash,
-                        email_verified_at, disabled_at, created_at, updated_at
+                        email_verified_at, disabled_at, locale, created_at, updated_at
                     from users
                     where id < $1
                       and (strpos(lower(email), lower($2)) > 0
@@ -236,7 +244,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
                     UserRow,
                     r#"
                     select id, email, username, phone, phone_verified_at, password_hash,
-                        email_verified_at, disabled_at, created_at, updated_at
+                        email_verified_at, disabled_at, locale, created_at, updated_at
                     from users
                     where id < $1
                     order by id desc
@@ -270,10 +278,33 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             update users set username = $2
             where id = $1
             returning id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             "#,
             id.as_uuid(),
             username.as_str(),
+        )
+        .fetch_optional(self.conn())
+        .await
+        .map_err(db_error)?
+        .map(User::try_from)
+        .transpose()
+    }
+
+    async fn set_user_locale(
+        &mut self,
+        id: UserId,
+        locale: Option<&Locale>,
+    ) -> Result<Option<User>, StorageError> {
+        sqlx::query_as!(
+            UserRow,
+            r#"
+            update users set locale = $2
+            where id = $1
+            returning id, email, username, phone, phone_verified_at, password_hash,
+                email_verified_at, disabled_at, locale, created_at, updated_at
+            "#,
+            id.as_uuid(),
+            locale.map(Locale::as_str),
         )
         .fetch_optional(self.conn())
         .await
@@ -294,7 +325,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             update users set email = $2, email_verified_at = $3
             where id = $1
             returning id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             "#,
             id.as_uuid(),
             email.as_str(),
@@ -318,7 +349,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             update users set phone = $2, phone_verified_at = $3
             where id = $1
             returning id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             "#,
             id.as_uuid(),
             phone.map(|(phone, _)| phone.as_str()),
@@ -359,7 +390,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
             update users set email_verified_at = coalesce(email_verified_at, $2)
             where id = $1
             returning id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             "#,
             id.as_uuid(),
             at,
@@ -385,7 +416,7 @@ impl<C: PgHandle> UserRepository for PgExecutor<C> {
                                    else coalesce(disabled_at, $2) end
             where id = $1
             returning id, email, username, phone, phone_verified_at, password_hash,
-                email_verified_at, disabled_at, created_at, updated_at
+                email_verified_at, disabled_at, locale, created_at, updated_at
             "#,
             id.as_uuid(),
             at,

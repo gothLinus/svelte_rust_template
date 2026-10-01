@@ -6,7 +6,7 @@
 use application::{
     Adapters,
     account::dto::{
-        AddPhoneRequest, ChangeEmailRequest, DeleteAccountRequest, SecurityDto,
+        AddPhoneRequest, ChangeEmailRequest, DeleteAccountRequest, SecurityDto, SetLocaleRequest,
         UpdateProfileRequest,
     },
     audit::dto::{AuditEventDto, ListActivityQuery},
@@ -19,7 +19,7 @@ use axum::{
     extract::State,
     http::{StatusCode, header::CONTENT_DISPOSITION},
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
 };
 use axum_extra::extract::CookieJar;
 use domain::session::SessionId;
@@ -40,6 +40,7 @@ pub fn routes<A: Adapters>() -> Router<AppState<A>> {
                 .patch(update_profile::<A>)
                 .delete(delete_account::<A>),
         )
+        .route("/me/locale", put(set_locale::<A>))
         .route("/me/email", post(change_email::<A>))
         .route("/me/password", post(change_password::<A>))
         .route("/me/phone", post(add_phone::<A>).delete(remove_phone::<A>))
@@ -49,6 +50,20 @@ pub fn routes<A: Adapters>() -> Router<AppState<A>> {
         .route("/me/sessions", get(sessions::<A>))
         .route("/me/sessions/{id}", delete(revoke_session::<A>))
         .route("/me/activity", get(activity::<A>))
+}
+
+async fn set_locale<A: Adapters>(
+    State(state): State<AppState<A>>,
+    user: CurrentUser,
+    Proto(body): Proto<SetLocaleRequest>,
+) -> Result<Proto<MeDto>, ApiError> {
+    Ok(Proto(
+        state
+            .services
+            .account
+            .set_locale(user.actor(), body)
+            .await?,
+    ))
 }
 
 async fn activity<A: Adapters>(

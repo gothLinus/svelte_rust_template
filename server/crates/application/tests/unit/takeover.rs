@@ -111,7 +111,7 @@ async fn registration_mark(fx: &Fixture, email: &str) -> domain::secret::Secret 
     match fx
         .services
         .auth
-        .register(register_request(email), ClientInfo::default())
+        .register(register_request(email), ClientInfo::default(), None)
         .await
         .unwrap()
     {
@@ -524,7 +524,7 @@ async fn a_taken_address_gets_a_decoy_mark_that_looks_real() {
     let Registered::VerificationPending { browser: decoy, .. } = fx
         .services
         .auth
-        .register(again, ClientInfo::default())
+        .register(again, ClientInfo::default(), None)
         .await
         .unwrap()
     else {

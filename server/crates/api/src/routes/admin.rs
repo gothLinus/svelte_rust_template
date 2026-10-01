@@ -19,7 +19,7 @@ use domain::user::UserId;
 use uuid::Uuid;
 
 use crate::{
-    extract::{Path, Proto, Query, RequirePermission, permission},
+    extract::{Language, Path, Proto, Query, RequirePermission, permission},
     problem::ApiError,
     state::AppState,
 };
@@ -79,8 +79,16 @@ async fn show_user<A: Adapters>(
 async fn list_roles<A: Adapters>(
     State(state): State<AppState<A>>,
     admin: RequirePermission<permission::UsersRead>,
+    Language(locale): Language,
 ) -> Result<Proto<Vec<RoleDto>>, ApiError> {
-    Ok(Proto(state.services.admin.list_roles(admin.actor()).await?))
+    let locale = locale.unwrap_or_else(|| state.translator.negotiate(None));
+    Ok(Proto(
+        state
+            .services
+            .admin
+            .list_roles(admin.actor(), &locale)
+            .await?,
+    ))
 }
 
 async fn grant_role<A: Adapters>(

@@ -6,6 +6,7 @@
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { resolve } from '$app/paths';
 	import Logo from '$lib/components/logo.svelte';
+	import LanguageMenu from '$lib/components/language-menu.svelte';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -28,6 +29,7 @@
 	<header class="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 p-4 sm:p-6">
 		<Logo />
 		<nav class="flex items-center gap-1 sm:gap-2">
+			<LanguageMenu />
 			<ThemeToggle />
 			{#if data.me}
 				<Button href={resolve('/dashboard')} size="sm">{t('landing-dashboard')}</Button>

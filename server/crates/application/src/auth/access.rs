@@ -132,7 +132,7 @@ pub(crate) async fn offer_password<A: Adapters>(ctx: &Context<A>, user: &User) {
             let ttl = ctx.settings.tokens.password_reset_ttl;
             mail::send(
                 &*ctx.mailer,
-                mail::choose_password(&ctx.voice(), user.email().clone(), &link, ttl),
+                mail::choose_password(&ctx.voice_for(user), user.email().clone(), &link, ttl),
             )
             .await;
         }

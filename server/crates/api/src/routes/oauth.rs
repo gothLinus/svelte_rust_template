@@ -28,7 +28,7 @@ use serde::Deserialize;
 use url::form_urlencoded;
 
 use crate::{
-    extract::{Client, CurrentUser, Form, OptionalUser, Path, Proto, Query},
+    extract::{Client, CurrentUser, Form, Language, OptionalUser, Path, Proto, Query},
     problem::ApiError,
     rate_limit::Action,
     state::AppState,
@@ -114,6 +114,7 @@ async fn begin<A: Adapters>(
 async fn callback<A: Adapters>(
     State(state): State<AppState<A>>,
     client: Client,
+    Language(locale): Language,
     user: OptionalUser,
     jar: CookieJar,
     Path(provider): Path<String>,
@@ -137,6 +138,7 @@ async fn callback<A: Adapters>(
                 state: &query.state,
                 cookie_state: cookie_state.as_ref(),
                 error: query.error.as_deref(),
+                locale,
             },
             user.0.as_ref().map(CurrentUser::actor),
             client.0,

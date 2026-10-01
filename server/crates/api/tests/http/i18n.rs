@@ -283,3 +283,83 @@ async fn timeouts_and_panics_are_localized() {
         assert_eq!(english.headers()["content-language"], "en");
     }
 }
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn an_account_keeps_the_language_it_registered_in_and_can_change_it(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let response = app
+        .send(
+            TestRequest::post("/api/v1/auth/register")
+                .proto(&v1::RegisterRequest {
+                    email: "alice@example.com".to_owned(),
+                    username: "alice".to_owned(),
+                    password: crate::support::PASSWORD.to_owned(),
+                })
+                .header("accept-language", "de-DE, en;q=0.5"),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::CREATED, "{}", response.text);
+    let token = response.session_token().unwrap();
+    assert_eq!(
+        app.me(&token).await.user.unwrap().locale.as_deref(),
+        Some("de")
+    );
+
+    let changed =
+        app.send(TestRequest::put("/api/v1/me/locale").session(&token).proto(
+            &v1::SetLocaleRequest {
+                locale: Some("en".to_owned()),
+            },
+        ))
+        .await;
+    assert_eq!(changed.status, StatusCode::OK, "{}", changed.text);
+    assert_eq!(
+        changed.decode::<v1::Me>().user.unwrap().locale.as_deref(),
+        Some("en")
+    );
+
+    app.send(
+        TestRequest::put("/api/v1/me/locale")
+            .session(&token)
+            .proto(&v1::SetLocaleRequest {
+                locale: Some("xx".to_owned()),
+            }),
+    )
+    .await
+    .assert_field_error("locale", "unsupported_locale");
+    app.send(TestRequest::put("/api/v1/me/locale").proto(&v1::SetLocaleRequest::default()))
+        .await
+        .assert_problem(StatusCode::UNAUTHORIZED, "unauthenticated");
+}
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn without_a_requested_language_an_account_has_none(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let token = app.register("alice@example.com").await;
+
+    assert!(app.me(&token).await.user.unwrap().locale.is_none());
+}
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn built_in_roles_are_described_in_the_requested_language(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let admin = app.admin("admin@example.com").await;
+
+    let roles = app
+        .send(
+            TestRequest::get("/api/v1/admin/roles")
+                .session(&admin)
+                .header("accept-language", "de"),
+        )
+        .await
+        .decode::<v1::RoleList>()
+        .roles;
+
+    let described = roles.iter().find(|role| role.name == "admin").unwrap();
+    assert_eq!(
+        described.description,
+        app.catalog
+            .translate(&german(), &Message::new("role-admin-description"))
+    );
+    assert_ne!(described.description, app.text("role-admin-description"));
+}

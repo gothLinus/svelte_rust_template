@@ -54,7 +54,7 @@ async fn usernames_and_verified_phone_numbers_sign_in_like_emails() {
     request.username = "Alice".to_owned();
     fx.services
         .auth
-        .register(request, ClientInfo::default())
+        .register(request, ClientInfo::default(), None)
         .await
         .unwrap();
 
@@ -73,7 +73,7 @@ async fn usernames_and_verified_phone_numbers_sign_in_like_emails() {
     let err = fx
         .services
         .auth
-        .register(taken, ClientInfo::default())
+        .register(taken, ClientInfo::default(), None)
         .await
         .unwrap_err();
     let AppError::Validation(errors) = err else {
@@ -146,6 +146,7 @@ fn parts_of(user: &domain::user::User) -> domain::user::UserParts {
         password_hash: user.password_hash().cloned(),
         email_verified_at: user.email_verified_at(),
         disabled_at: user.disabled_at(),
+        locale: user.locale().cloned(),
         created_at: user.created_at(),
         updated_at: user.updated_at(),
     }
@@ -881,6 +882,7 @@ async fn oauth_callback(
                 state: &state,
                 cookie_state: Some(&started.state),
                 error: None,
+                locale: None,
             },
             linking,
             ClientInfo::default(),
@@ -1021,6 +1023,7 @@ async fn social_sign_in_checks_the_state_and_the_provider() {
                 state: &state,
                 cookie_state: Some(&other),
                 error: None,
+                locale: None,
             },
             None,
             ClientInfo::default(),
@@ -1064,6 +1067,7 @@ async fn social_sign_in_checks_the_state_and_the_provider() {
                 state: &state,
                 cookie_state: Some(&started.state),
                 error: None,
+                locale: None,
             },
             None,
             ClientInfo::default(),
@@ -1558,7 +1562,7 @@ async fn undoing_an_email_change_fails_once_the_old_address_is_taken() {
     someone.username = "someone".to_owned();
     fx.services
         .auth
-        .register(someone, ClientInfo::default())
+        .register(someone, ClientInfo::default(), None)
         .await
         .unwrap();
 

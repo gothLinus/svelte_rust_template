@@ -558,7 +558,7 @@ impl<A: Adapters> PasskeyService<A> {
         else {
             return;
         };
-        mail::notify(&self.ctx, user.email().clone(), what).await;
+        mail::notify(&self.ctx, &user, what).await;
     }
 }
 

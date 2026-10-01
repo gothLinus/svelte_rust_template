@@ -5,7 +5,8 @@ use domain::{
     clock::Clock,
     database::{Database, Transaction},
     error::StorageError,
-    rbac::{Permission, RbacRepository, RoleName},
+    i18n::{Locale, Message},
+    rbac::{Permission, RbacRepository, Role, RoleName},
     session::SessionRepository,
     user::{User, UserId, UserRepository},
 };
@@ -63,10 +64,34 @@ impl<A: Adapters> AdminService<A> {
         Ok(user_dto(&mut conn, &user).await?)
     }
 
-    pub async fn list_roles(&self, actor: &Actor) -> Result<Vec<RoleDto>, AppError> {
+    /// Every role, with the built-in ones described in `locale`; roles added since keep the
+    /// description stored with them.
+    pub async fn list_roles(
+        &self,
+        actor: &Actor,
+        locale: &Locale,
+    ) -> Result<Vec<RoleDto>, AppError> {
         AdminPolicy::can_view_users(actor)?;
         let roles = self.ctx.db.connection().await?.list_roles().await?;
-        Ok(roles.into_iter().map(RoleDto::from).collect())
+        Ok(roles
+            .into_iter()
+            .map(|role| self.describe(role, locale))
+            .collect())
+    }
+
+    fn describe(&self, role: Role, locale: &Locale) -> RoleDto {
+        let description = if role.name == RoleName::ADMIN {
+            Some(Message::new("role-admin-description"))
+        } else if role.name == RoleName::USER {
+            Some(Message::new("role-user-description"))
+        } else {
+            None
+        };
+        let mut dto = RoleDto::from(role);
+        if let Some(description) = description {
+            dto.description = self.ctx.translator.translate(locale, &description);
+        }
+        dto
     }
 
     /// Gives the user a role. Their sessions get a new token on their next request, since their

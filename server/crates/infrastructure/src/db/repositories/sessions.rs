@@ -77,6 +77,7 @@ struct AuthenticatedRow {
     password_hash: Option<String>,
     email_verified_at: Option<OffsetDateTime>,
     disabled_at: Option<OffsetDateTime>,
+    locale: Option<String>,
     user_created_at: OffsetDateTime,
     user_updated_at: OffsetDateTime,
     permissions: Vec<String>,
@@ -95,6 +96,7 @@ impl TryFrom<AuthenticatedRow> for AuthenticatedSession {
             password_hash: row.password_hash,
             email_verified_at: row.email_verified_at,
             disabled_at: row.disabled_at,
+            locale: row.locale,
             created_at: row.user_created_at,
             updated_at: row.user_updated_at,
         })?;
@@ -159,7 +161,7 @@ impl<C: PgHandle> SessionRepository for PgExecutor<C> {
                 s.rotation_pending, s.created_at, s.last_seen_at, s.expires_at,
                 s.reauthenticated_at,
                 u.email, u.username, u.phone, u.phone_verified_at,
-                u.password_hash, u.email_verified_at, u.disabled_at,
+                u.password_hash, u.email_verified_at, u.disabled_at, u.locale,
                 u.created_at as user_created_at, u.updated_at as user_updated_at,
                 array(
                     select distinct rp.permission

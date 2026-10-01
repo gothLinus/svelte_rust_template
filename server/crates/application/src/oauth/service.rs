@@ -5,7 +5,7 @@ use domain::{
     audit::{AuditAction, AuditRepository, AuthMethod},
     clock::Clock,
     database::{Database, Transaction},
-    i18n::Message,
+    i18n::{Locale, Message},
     identity::{
         AuthorizationRequest, IDENTITY_PROVIDER_UNIQUE_CONSTRAINT,
         IDENTITY_SUBJECT_UNIQUE_CONSTRAINT, IdentityRepository, NewIdentity, OAUTH_FLOW_TTL,
@@ -59,6 +59,8 @@ pub struct CallbackParams<'a> {
     pub state: &'a str,
     pub cookie_state: Option<&'a Secret>,
     pub error: Option<&'a str>,
+    /// The language the browser asked for, kept on an account this callback creates.
+    pub locale: Option<Locale>,
 }
 
 pub struct OAuthService<A: Adapters> {
@@ -211,7 +213,10 @@ impl<A: Adapters> OAuthService<A> {
                 self.link(actor, &provider, &profile).await?;
                 OAuthOutcome::Linked
             }
-            None => match self.sign_in(&provider, &profile, client, previous).await? {
+            None => match self
+                .sign_in(&provider, &profile, client, previous, params.locale)
+                .await?
+            {
                 LoginOutcome::SignedIn(signed_in) => OAuthOutcome::SignedIn(signed_in),
                 LoginOutcome::MfaRequired(required) => OAuthOutcome::MfaRequired(required),
             },
@@ -262,6 +267,7 @@ impl<A: Adapters> OAuthService<A> {
         profile: &ProviderProfile,
         client: ClientInfo,
         previous: Option<&Secret>,
+        locale: Option<Locale>,
     ) -> Result<LoginOutcome, AppError> {
         let now = self.ctx.clock.now();
         let mut conn = self.ctx.db.connection().await?;
@@ -286,7 +292,7 @@ impl<A: Adapters> OAuthService<A> {
         }
         drop(conn);
 
-        let user = self.sign_up(provider, profile, &client).await?;
+        let user = self.sign_up(provider, profile, &client, locale).await?;
         signin::complete_first_step(
             &self.ctx,
             &user,
@@ -309,6 +315,7 @@ impl<A: Adapters> OAuthService<A> {
         provider: &ProviderId,
         profile: &ProviderProfile,
         client: &ClientInfo,
+        locale: Option<Locale>,
     ) -> Result<User, AppError> {
         let email = profile
             .email
@@ -337,6 +344,7 @@ impl<A: Adapters> OAuthService<A> {
                 username,
                 password_hash: None,
                 email_verified_at: Some(now),
+                locale,
             })
             .await
         {
@@ -432,7 +440,7 @@ impl<A: Adapters> OAuthService<A> {
         if let Some(owner) = owner {
             let what = Message::new("notice-identity-linked")
                 .arg("provider", self.provider_name(provider.as_str()));
-            mail::notify(&self.ctx, owner.email().clone(), what).await;
+            mail::notify(&self.ctx, &owner, what).await;
         }
         tracing::info!(user_id = %user, %provider, "social account linked");
         Ok(())

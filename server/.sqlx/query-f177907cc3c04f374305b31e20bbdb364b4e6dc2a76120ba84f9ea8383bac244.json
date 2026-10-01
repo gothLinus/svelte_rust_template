@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            insert into users (id, email, username, password_hash, email_verified_at)\n            values ($1, $2, $3, $4, $5)\n            returning id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, created_at, updated_at\n            ",
+  "query": "\n            select id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, locale, created_at, updated_at\n            from users\n            where id = any($1)\n            ",
   "describe": {
     "columns": [
       {
@@ -93,6 +93,17 @@
       },
       {
         "ordinal": 8,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -116,11 +127,7 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Text",
-        "Text",
-        "Text",
-        "Timestamptz"
+        "UuidArray"
       ]
     },
     "nullable": [
@@ -132,9 +139,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "d1a954cbacef24c90307ba20dfafe16b1f71833037ecb48c5b5a8fac7288103c"
+  "hash": "f177907cc3c04f374305b31e20bbdb364b4e6dc2a76120ba84f9ea8383bac244"
 }

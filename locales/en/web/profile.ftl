@@ -1,4 +1,8 @@
-## Cards on the profile page: email address, phone number, personal data.
+## Cards on the profile page: language, email address, phone number, personal data.
+
+profile-language-title = Language
+profile-language-description = The language of this app, and of the emails and texts we send you.
+profile-language-saved = Language saved.
 
 profile-data-title = Your data
 profile-data-description = A copy of everything stored about you, as JSON.

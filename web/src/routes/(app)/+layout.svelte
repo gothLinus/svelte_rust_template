@@ -5,6 +5,7 @@
 	import BottomNav from '$lib/components/bottom-nav.svelte';
 	import EmailVerificationBanner from '$lib/components/email-verification-banner.svelte';
 	import Logo from '$lib/components/logo.svelte';
+	import LanguageMenu from '$lib/components/language-menu.svelte';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import UserMenu from '$lib/components/user-menu.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
@@ -70,6 +71,7 @@
 				</Breadcrumb.Root>
 			{/if}
 			<div class="ml-auto flex items-center gap-1">
+				<LanguageMenu />
 				<ThemeToggle />
 				<UserMenu user={data.me.user} class="-mr-1 md:hidden" />
 			</div>

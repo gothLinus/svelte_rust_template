@@ -59,7 +59,11 @@ async fn register_rejects_a_taken_email_case_insensitively() {
     let err = fx
         .services
         .auth
-        .register(register_request("ALICE@example.com"), ClientInfo::default())
+        .register(
+            register_request("ALICE@example.com"),
+            ClientInfo::default(),
+            None,
+        )
         .await
         .unwrap_err();
 
@@ -76,7 +80,7 @@ async fn register_reports_every_invalid_field() {
     let AppError::Validation(errors) = fx
         .services
         .auth
-        .register(request, ClientInfo::default())
+        .register(request, ClientInfo::default(), None)
         .await
         .unwrap_err()
     else {
@@ -106,7 +110,11 @@ async fn with_required_verification_registration_does_not_sign_in() {
     let outcome = fx
         .services
         .auth
-        .register(register_request("alice@example.com"), ClientInfo::default())
+        .register(
+            register_request("alice@example.com"),
+            ClientInfo::default(),
+            None,
+        )
         .await
         .unwrap();
 
@@ -786,7 +794,11 @@ async fn with_required_verification_only_verified_accounts_keep_their_sessions()
     let Registered::VerificationPending { browser, .. } = fx
         .services
         .auth
-        .register(register_request("alice@example.com"), ClientInfo::default())
+        .register(
+            register_request("alice@example.com"),
+            ClientInfo::default(),
+            None,
+        )
         .await
         .unwrap()
     else {

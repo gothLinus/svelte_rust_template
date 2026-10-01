@@ -22,6 +22,7 @@ pub fn new_user(email: &str) -> NewUser {
         username: Username::parse(email.split('@').next().unwrap()).unwrap(),
         password_hash: Some(PasswordHash::new("$argon2id$fake")),
         email_verified_at: None,
+        locale: None,
     }
 }
 

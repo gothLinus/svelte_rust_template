@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            update users set phone = $2, phone_verified_at = $3\n            where id = $1\n            returning id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, created_at, updated_at\n            ",
+  "query": "\n            update users\n            set disabled_at = case when $2::timestamptz is null then null\n                                   else coalesce(disabled_at, $2) end\n            where id = $1\n            returning id, email, username, phone, phone_verified_at, password_hash,\n                email_verified_at, disabled_at, locale, created_at, updated_at\n            ",
   "describe": {
     "columns": [
       {
@@ -93,6 +93,17 @@
       },
       {
         "ordinal": 8,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "users",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -117,7 +128,6 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
         "Timestamptz"
       ]
     },
@@ -130,9 +140,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "9479aede935a8ca6ca8faf1ff3382f1666b77f2a6074770661f4146e7f934d8e"
+  "hash": "510e15c689db83ff1f314217d332e715e4c40f011afb8fb5880e72306f657c5b"
 }

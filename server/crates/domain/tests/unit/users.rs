@@ -194,6 +194,7 @@ fn user_status_follows_its_timestamps() {
         password_hash: None,
         email_verified_at: None,
         disabled_at: None,
+        locale: None,
         created_at: at,
         updated_at: at,
     };
@@ -212,6 +213,16 @@ fn user_status_follows_its_timestamps() {
     assert!(settled.is_disabled());
     assert!(settled.is_email_verified());
     assert!(settled.has_password());
+    assert!(settled.locale().is_none());
+
+    let german = User::from_parts(UserParts {
+        locale: domain::i18n::Locale::parse("de"),
+        ..parts()
+    });
+    assert_eq!(
+        german.locale().map(domain::i18n::Locale::as_str),
+        Some("de")
+    );
 }
 
 #[test]

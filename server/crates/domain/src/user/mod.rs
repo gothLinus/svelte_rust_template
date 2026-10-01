@@ -8,7 +8,7 @@
 
 use time::OffsetDateTime;
 
-use crate::id::Id;
+use crate::{i18n::Locale, id::Id};
 
 pub use email::{Email, MAX_EMAIL_LEN};
 pub use identifier::LoginIdentifier;
@@ -48,6 +48,9 @@ pub struct User {
     password_hash: Option<PasswordHash>,
     email_verified_at: Option<OffsetDateTime>,
     disabled_at: Option<OffsetDateTime>,
+    /// The language mail and texts to the user are written in. `None` until they choose one or
+    /// register with one, which leaves it to the server's default.
+    locale: Option<Locale>,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
 }
@@ -61,6 +64,7 @@ pub struct UserParts {
     pub password_hash: Option<PasswordHash>,
     pub email_verified_at: Option<OffsetDateTime>,
     pub disabled_at: Option<OffsetDateTime>,
+    pub locale: Option<Locale>,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
@@ -76,6 +80,7 @@ impl User {
             password_hash: parts.password_hash,
             email_verified_at: parts.email_verified_at,
             disabled_at: parts.disabled_at,
+            locale: parts.locale,
             created_at: parts.created_at,
             updated_at: parts.updated_at,
         }
@@ -134,6 +139,10 @@ impl User {
         self.disabled_at.is_some()
     }
 
+    pub fn locale(&self) -> Option<&Locale> {
+        self.locale.as_ref()
+    }
+
     pub fn created_at(&self) -> OffsetDateTime {
         self.created_at
     }
@@ -150,6 +159,7 @@ pub struct NewUser {
     pub username: Username,
     pub password_hash: Option<PasswordHash>,
     pub email_verified_at: Option<OffsetDateTime>,
+    pub locale: Option<Locale>,
 }
 
 #[derive(Debug, Clone, Default)]

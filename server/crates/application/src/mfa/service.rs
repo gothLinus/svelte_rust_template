@@ -305,6 +305,6 @@ impl<A: Adapters> MfaService<A> {
     }
 
     async fn notify(&self, user: &User, what: Message) {
-        mail::notify(&self.ctx, user.email().clone(), what).await;
+        mail::notify(&self.ctx, user, what).await;
     }
 }

@@ -19,6 +19,7 @@ import {
 	ReauthenticateRequestSchema,
 	RoleListSchema,
 	SessionListSchema,
+	SetLocaleRequestSchema,
 	TextChannel,
 	UpdateNoteRequestSchema,
 	UserPageSchema,
@@ -296,6 +297,19 @@ describe('me', () => {
 			'POST /me/passkeys',
 			'GET /me/activity?limit=3&after=c1'
 		]);
+	});
+
+	it('sets the language, or clears it', async () => {
+		const fetchFn = mockFetch(signedIn());
+		const api = createApi(fetchFn);
+
+		await api.me.setLocale('de');
+		await api.me.setLocale();
+
+		expect(callOf(fetchFn)[0]).toBe(`${API_BASE}/me/locale`);
+		expect(callOf(fetchFn)[1].method).toBe('PUT');
+		expect(sent(fetchFn, SetLocaleRequestSchema).locale).toBe('de');
+		expect(sent(fetchFn, SetLocaleRequestSchema, 1).locale).toBeUndefined();
 	});
 });
 

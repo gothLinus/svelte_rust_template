@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file api/v1/account.proto.
  */
 export const file_api_v1_account: GenFile = /*@__PURE__*/
-  fileDesc("ChRhcGkvdjEvYWNjb3VudC5wcm90bxIGYXBpLnYxIigKFFVwZGF0ZVByb2ZpbGVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIiMKEkNoYW5nZUVtYWlsUmVxdWVzdBINCgVlbWFpbBgBIAEoCSJGCg9BZGRQaG9uZVJlcXVlc3QSDQoFcGhvbmUYASABKAkSJAoHY2hhbm5lbBgCIAEoDjITLmFwaS52MS5UZXh0Q2hhbm5lbCJAChREZWxldGVBY2NvdW50UmVxdWVzdBIbCghwYXNzd29yZBgBIAEoCUIEgLUYAUgAiAEBQgsKCV9wYXNzd29yZCLIAQoQU2VjdXJpdHlPdmVydmlldxIUCgxoYXNfcGFzc3dvcmQYASABKAgSEwoLbWZhX2VuYWJsZWQYAiABKAgSFAoMdG90cF9lbmFibGVkGAMgASgIEiAKGHJlY292ZXJ5X2NvZGVzX3JlbWFpbmluZxgEIAEoDRIhCghwYXNza2V5cxgFIAMoCzIPLmFwaS52MS5QYXNza2V5Ei4KD2xpbmtlZF9hY2NvdW50cxgGIAMoCzIVLmFwaS52MS5MaW5rZWRBY2NvdW50YgZwcm90bzM", [file_api_v1_oauth, file_api_v1_options, file_api_v1_passkeys, file_api_v1_passwordless]);
+  fileDesc("ChRhcGkvdjEvYWNjb3VudC5wcm90bxIGYXBpLnYxIigKFFVwZGF0ZVByb2ZpbGVSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJIjIKEFNldExvY2FsZVJlcXVlc3QSEwoGbG9jYWxlGAEgASgJSACIAQFCCQoHX2xvY2FsZSIjChJDaGFuZ2VFbWFpbFJlcXVlc3QSDQoFZW1haWwYASABKAkiRgoPQWRkUGhvbmVSZXF1ZXN0Eg0KBXBob25lGAEgASgJEiQKB2NoYW5uZWwYAiABKA4yEy5hcGkudjEuVGV4dENoYW5uZWwiQAoURGVsZXRlQWNjb3VudFJlcXVlc3QSGwoIcGFzc3dvcmQYASABKAlCBIC1GAFIAIgBAUILCglfcGFzc3dvcmQiyAEKEFNlY3VyaXR5T3ZlcnZpZXcSFAoMaGFzX3Bhc3N3b3JkGAEgASgIEhMKC21mYV9lbmFibGVkGAIgASgIEhQKDHRvdHBfZW5hYmxlZBgDIAEoCBIgChhyZWNvdmVyeV9jb2Rlc19yZW1haW5pbmcYBCABKA0SIQoIcGFzc2tleXMYBSADKAsyDy5hcGkudjEuUGFzc2tleRIuCg9saW5rZWRfYWNjb3VudHMYBiADKAsyFS5hcGkudjEuTGlua2VkQWNjb3VudGIGcHJvdG8z", [file_api_v1_oauth, file_api_v1_options, file_api_v1_passkeys, file_api_v1_passwordless]);
 
 /**
  * @generated from message api.v1.UpdateProfileRequest
@@ -39,6 +39,26 @@ export const UpdateProfileRequestSchema: GenMessage<UpdateProfileRequest> = /*@_
   messageDesc(file_api_v1_account, 0);
 
 /**
+ * `PUT /me/locale`: the language for mail and texts, one the app is available in. Absent
+ * leaves it to the server's default.
+ *
+ * @generated from message api.v1.SetLocaleRequest
+ */
+export type SetLocaleRequest = Message<"api.v1.SetLocaleRequest"> & {
+  /**
+   * @generated from field: optional string locale = 1;
+   */
+  locale?: string | undefined;
+};
+
+/**
+ * Describes the message api.v1.SetLocaleRequest.
+ * Use `create(SetLocaleRequestSchema)` to create a new message.
+ */
+export const SetLocaleRequestSchema: GenMessage<SetLocaleRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_account, 1);
+
+/**
  * @generated from message api.v1.ChangeEmailRequest
  */
 export type ChangeEmailRequest = Message<"api.v1.ChangeEmailRequest"> & {
@@ -53,7 +73,7 @@ export type ChangeEmailRequest = Message<"api.v1.ChangeEmailRequest"> & {
  * Use `create(ChangeEmailRequestSchema)` to create a new message.
  */
 export const ChangeEmailRequestSchema: GenMessage<ChangeEmailRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_account, 1);
+  messageDesc(file_api_v1_account, 2);
 
 /**
  * @generated from message api.v1.AddPhoneRequest
@@ -75,7 +95,7 @@ export type AddPhoneRequest = Message<"api.v1.AddPhoneRequest"> & {
  * Use `create(AddPhoneRequestSchema)` to create a new message.
  */
 export const AddPhoneRequestSchema: GenMessage<AddPhoneRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_account, 2);
+  messageDesc(file_api_v1_account, 3);
 
 /**
  * @generated from message api.v1.DeleteAccountRequest
@@ -95,7 +115,7 @@ export type DeleteAccountRequest = Message<"api.v1.DeleteAccountRequest"> & {
  * Use `create(DeleteAccountRequestSchema)` to create a new message.
  */
 export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_account, 3);
+  messageDesc(file_api_v1_account, 4);
 
 /**
  * @generated from message api.v1.SecurityOverview
@@ -139,5 +159,5 @@ export type SecurityOverview = Message<"api.v1.SecurityOverview"> & {
  * Use `create(SecurityOverviewSchema)` to create a new message.
  */
 export const SecurityOverviewSchema: GenMessage<SecurityOverview> = /*@__PURE__*/
-  messageDesc(file_api_v1_account, 4);
+  messageDesc(file_api_v1_account, 5);
 

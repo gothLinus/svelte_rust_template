@@ -41,6 +41,7 @@ impl IntoMessage for UserDto {
             disabled: self.disabled,
             roles: self.roles,
             created_at: Some(timestamp(self.created_at)),
+            locale: self.locale,
         }
     }
 }

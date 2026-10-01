@@ -11,6 +11,7 @@
 	import ReauthDialog from '$lib/components/reauth/reauth-dialog.svelte';
 	import SessionErrorBanner from '$lib/components/session-error-banner.svelte';
 	import { t } from '$lib/i18n';
+	import { followAccountLanguage } from '$lib/helpers/language';
 	import { site } from '$lib/helpers/site.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
 
@@ -18,6 +19,10 @@
 
 	session.connect(() => data.me);
 	site.connect(() => data.methods.appName);
+
+	$effect(() => {
+		void followAccountLanguage(data.me?.user.locale);
+	});
 
 	let ending = false;
 	setUnauthenticatedHandler(() => {
