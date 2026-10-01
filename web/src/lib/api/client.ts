@@ -47,7 +47,8 @@ export function encode<Desc extends DescMessage>(
 
 export interface RequestOptions<T = void> {
 	query?: Query;
-	body?: Uint8Array<ArrayBuffer>;
+	body?: Uint8Array<ArrayBuffer> | Blob;
+	contentType?: string;
 	/** Extra request headers, such as `if-match` (see `ifMatch`). */
 	headers?: Record<string, string>;
 	response?: Decoder<T>;
@@ -180,6 +181,7 @@ export class ApiClient {
 			signal,
 			timeoutMs,
 			accept = PROTOBUF,
+			contentType = PROTOBUF,
 			headers: extraHeaders
 		} = options;
 		const headers: Record<string, string> = {
@@ -188,7 +190,7 @@ export class ApiClient {
 			'x-requested-with': 'fetch',
 			'accept-language': i18n.locale
 		};
-		if (body !== undefined) headers['content-type'] = PROTOBUF;
+		if (body !== undefined) headers['content-type'] = contentType;
 		const timeout = AbortSignal.timeout(timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
 		let response: Response;

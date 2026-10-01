@@ -1,3 +1,4 @@
+import FolderOpenIcon from '@lucide/svelte/icons/folder-open';
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import NotebookPenIcon from '@lucide/svelte/icons/notebook-pen';
 import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
@@ -51,7 +52,8 @@ export const navigation: NavGroup[] = [
 		() => t('nav-workspace'),
 		[
 			page(() => t('nav-dashboard'), '/dashboard', LayoutDashboardIcon),
-			page(() => t('notes-nav'), '/notes', NotebookPenIcon, Permission.NOTES_READ)
+			page(() => t('notes-nav'), '/notes', NotebookPenIcon, Permission.NOTES_READ),
+			page(() => t('files-nav'), '/files', FolderOpenIcon, Permission.FILES_READ)
 		]
 	),
 	group(

@@ -4,12 +4,15 @@ import {
 	API_BASE,
 	ApiError,
 	INVALID_RESPONSE,
+	UPLOAD_TIMEOUT_MS,
+	contentUrl,
 	createApi,
 	oauthLinkUrl,
 	oauthUrl,
 	setReauthenticator
 } from '$lib/api';
 import {
+	FileUsageSchema,
 	LoginRequestSchema,
 	MeSchema,
 	MfaChallengeSchema,
@@ -20,13 +23,26 @@ import {
 	RoleListSchema,
 	SessionListSchema,
 	SetLocaleRequestSchema,
+	StoredFilePageSchema,
+	StoredFileSchema,
 	TextChannel,
+	UpdateFileRequestSchema,
 	UpdateNoteRequestSchema,
 	UserPageSchema,
 	UserSchema,
 	VerificationPendingSchema
 } from '$lib/types/api';
-import { callOf, me, mockFetch, noContent, note, problem, reply, sent } from '../helpers';
+import {
+	callOf,
+	me,
+	mockFetch,
+	noContent,
+	note,
+	problem,
+	reply,
+	sent,
+	storedFile
+} from '../helpers';
 
 const ok = noContent;
 const signedIn = (status = 200) => reply(MeSchema, me(), status);
@@ -346,6 +362,77 @@ describe('notes', () => {
 			'DELETE /notes/n1',
 			'POST /notes/n1/duplicate'
 		]);
+	});
+});
+
+describe('files', () => {
+	it('lists, reads, renames and removes files', async () => {
+		const fetchFn = mockFetch(
+			reply(StoredFilePageSchema, { items: [storedFile()], nextCursor: 'c1' }),
+			reply(StoredFileSchema, storedFile()),
+			reply(FileUsageSchema, { usedBytes: 10n, quotaBytes: 100n }),
+			reply(StoredFileSchema, storedFile(undefined, { name: 'q3.pdf' })),
+			ok()
+		);
+		const api = createApi(fetchFn);
+
+		const page = await api.files.list({ scope: 'all', limit: 5, after: 'c0' });
+		await api.files.get('f1');
+		const usage = await api.files.usage();
+		const renamed = await api.files.rename('f1', 'q3.pdf');
+		await api.files.remove('f1');
+
+		expect(page.items).toEqual([storedFile()]);
+		expect(page.nextCursor).toBe('c1');
+		expect(usage.usedBytes).toBe(10n);
+		expect(usage.quotaBytes).toBe(100n);
+		expect(renamed.name).toBe('q3.pdf');
+		expect(sent(fetchFn, UpdateFileRequestSchema, 3)).toEqual(
+			create(UpdateFileRequestSchema, { name: 'q3.pdf' })
+		);
+		expect(
+			fetchFn.mock.calls.map(
+				([url, init]) => `${init?.method} ${String(url).replace(API_BASE, '')}`
+			)
+		).toEqual([
+			'GET /files?scope=all&limit=5&after=c0',
+			'GET /files/f1',
+			'GET /files/usage',
+			'PATCH /files/f1',
+			'DELETE /files/f1'
+		]);
+		expect(contentUrl('a/b')).toBe(`${API_BASE}/files/a%2Fb/content`);
+	});
+
+	it('uploads the file itself as the body, with its type and a longer timeout', async () => {
+		const timeout = vi.spyOn(AbortSignal, 'timeout');
+		const fetchFn = mockFetch(reply(StoredFileSchema, storedFile(), 201));
+		const file = new File(['%PDF'], 'ignored.pdf', { type: 'application/pdf' });
+
+		const stored = await createApi(fetchFn).files.upload(file, 'Q3 report.pdf');
+		const timeouts = timeout.mock.calls.map(([ms]) => ms);
+		timeout.mockRestore();
+
+		expect(stored).toEqual(storedFile());
+		const [url, init] = callOf(fetchFn);
+		expect(url).toBe(`${API_BASE}/files?name=Q3+report.pdf`);
+		expect(init.method).toBe('POST');
+		expect(init.body).toBe(file);
+		expect(new Headers(init.headers).get('content-type')).toBe('application/pdf');
+		expect(new Headers(init.headers).get('x-requested-with')).toBe('fetch');
+		// The whole file must arrive before it: far longer than any other request's.
+		expect(timeouts).toEqual([UPLOAD_TIMEOUT_MS]);
+		expect(UPLOAD_TIMEOUT_MS).toBe(10 * 60 * 1000);
+	});
+
+	it('uploads a file of unknown type as octet-stream', async () => {
+		const fetchFn = mockFetch(reply(StoredFileSchema, storedFile(), 201));
+
+		await createApi(fetchFn).files.upload(new Blob(['x']), 'data');
+
+		expect(new Headers(callOf(fetchFn)[1].headers).get('content-type')).toBe(
+			'application/octet-stream'
+		);
 	});
 });
 

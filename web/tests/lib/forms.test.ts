@@ -3,10 +3,12 @@ import { ApiError } from '$lib/api';
 import { t } from '$lib/i18n';
 import { FormState, invalid, rules, validate } from '$lib/forms';
 import {
+	MAX_FILE_NAME_LENGTH,
 	MAX_NOTE_BODY_LENGTH,
 	MAX_NOTE_TITLE_LENGTH,
 	MAX_PASSKEY_NAME_LENGTH,
-	MAX_PASSWORD_LENGTH
+	MAX_PASSWORD_LENGTH,
+	uploadName
 } from '$lib/forms/validation';
 
 describe('validators mirror the server', () => {
@@ -74,6 +76,9 @@ describe('validators mirror the server', () => {
 			t('validation-too-long', { max: MAX_NOTE_TITLE_LENGTH })
 		);
 		expect(rules.noteTitle('two\nlines')).toBe(t('validation-single-line'));
+		expect(rules.noteTitle('evil\u202etxt.exe')).toBe(t('validation-single-line'));
+		// Right-to-left marks are no overrides.
+		expect(rules.noteTitle('\u05e9\u05dc\u05d5\u05dd\u200f')).toBeUndefined();
 
 		expect(rules.noteBody('')).toBeUndefined();
 		expect(rules.noteBody('line one\n\tline two')).toBeUndefined();
@@ -81,6 +86,46 @@ describe('validators mirror the server', () => {
 			t('validation-too-long', { max: MAX_NOTE_BODY_LENGTH })
 		);
 		expect(rules.noteBody('bell\u0007')).toBe(t('validation-control-characters'));
+	});
+
+	it('file names', () => {
+		expect(rules.fileName(' report.pdf ')).toBeUndefined();
+		expect(rules.fileName('Grüße.txt')).toBeUndefined();
+		expect(rules.fileName('.hidden')).toBeUndefined();
+		expect(rules.fileName('  ')).toBe(t('validation-required'));
+		expect(rules.fileName('ä'.repeat(MAX_FILE_NAME_LENGTH))).toBeUndefined();
+		expect(rules.fileName('a'.repeat(MAX_FILE_NAME_LENGTH + 1))).toBe(
+			t('validation-too-long', { max: MAX_FILE_NAME_LENGTH })
+		);
+		for (const name of [
+			'a/b',
+			'a\\b',
+			'.',
+			'..',
+			'ta\tb',
+			'c1\u0085',
+			'invoice\u202efdp.exe',
+			'isolated\u2067.txt'
+		]) {
+			expect(rules.fileName(name), name).toBe(t('file-name-invalid'));
+		}
+	});
+
+	it('upload names pass the file name rules', () => {
+		expect(uploadName('report.pdf')).toBe('report.pdf');
+		expect(uploadName(' a\\b/c\td\u202e.txt ')).toBe('a_b_c_d_.txt');
+		expect(uploadName('..')).toBe(t('files-unnamed'));
+		expect(uploadName('   ')).toBe(t('files-unnamed'));
+
+		const long = uploadName(`${'ä'.repeat(MAX_FILE_NAME_LENGTH)}.tar.gz`);
+		expect([...long].length).toBe(MAX_FILE_NAME_LENGTH);
+		expect(long.endsWith('ä.gz')).toBe(true);
+		// An "extension" that long is just part of the name.
+		const dotted = uploadName(`a.${'b'.repeat(MAX_FILE_NAME_LENGTH)}`);
+		expect(dotted).toBe(`a.${'b'.repeat(MAX_FILE_NAME_LENGTH - 2)}`);
+		for (const name of ['a\\b', long, dotted]) {
+			expect(rules.fileName(uploadName(name)), name).toBeUndefined();
+		}
 	});
 
 	it('passkey names', () => {

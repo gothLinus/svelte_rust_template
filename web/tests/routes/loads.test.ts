@@ -8,6 +8,7 @@ import { load as adminLoad } from '../../src/routes/(app)/admin/+layout';
 import { load as auditLoad } from '../../src/routes/(app)/admin/audit/+page';
 import { load as usersLoad } from '../../src/routes/(app)/admin/users/+page';
 import { load as dashboardLoad } from '../../src/routes/(app)/dashboard/+page';
+import { load as filesLoad } from '../../src/routes/(app)/files/+page';
 import { load as notesLoad } from '../../src/routes/(app)/notes/+page';
 import { load as settingsLoad } from '../../src/routes/(app)/settings/+page';
 import { load as securityLoad } from '../../src/routes/(app)/settings/security/+page';
@@ -15,15 +16,27 @@ import { load as guestLoad } from '../../src/routes/(public)/(guest)/+layout';
 import {
 	AuditEventPageSchema,
 	AuthMethodsSchema,
+	FileUsageSchema,
 	MeSchema,
 	NotePageSchema,
 	Permission,
 	RoleListSchema,
 	SecurityOverviewSchema,
 	SessionListSchema,
+	StoredFilePageSchema,
 	UserPageSchema
 } from '$lib/types/api';
-import { loadEvent, me, methods, mockFetch, note, problem, reply, routeFetch } from '../helpers';
+import {
+	loadEvent,
+	me,
+	methods,
+	mockFetch,
+	note,
+	problem,
+	reply,
+	routeFetch,
+	storedFile
+} from '../helpers';
 
 function loaded<T>(data: T | void): T {
 	if (!data) throw new Error('the load function returned nothing');
@@ -187,6 +200,56 @@ describe('page loads', () => {
 					parent: async () => ({ me: me() }),
 					depends: vi.fn(),
 					url: new URL('http://app.test/notes?scope=all')
+				})
+			)
+		);
+		expect(isHttpError(error, 403)).toBe(true);
+	});
+
+	it('files: the page and the usage, with scope and cursor from the URL', async () => {
+		const fetchFn = routeFetch({
+			'/files': reply(StoredFilePageSchema, { items: [storedFile()], nextCursor: 'c2' }),
+			'/files/usage': reply(FileUsageSchema, { usedBytes: 3n, quotaBytes: 10n })
+		});
+		const depends = vi.fn();
+
+		const data = loaded(
+			await filesLoad(
+				loadEvent({
+					fetch: fetchFn,
+					parent: async () => ({ me: me() }),
+					depends,
+					url: new URL('http://app.test/files?scope=all&after=c1')
+				})
+			)
+		);
+
+		expect(data).toMatchObject({ scope: 'all', after: 'c1' });
+		expect(data.files.items).toEqual([storedFile()]);
+		expect(data.usage.quotaBytes).toBe(10n);
+		expect(fetchFn.mock.calls.map(([url]) => String(url))).toEqual([
+			`${API_BASE}/files?scope=all&after=c1&limit=20`,
+			`${API_BASE}/files/usage`
+		]);
+		expect(depends).toHaveBeenCalledWith('app:files');
+
+		const mine = await filesLoad(
+			loadEvent({
+				fetch: fetchFn,
+				parent: async () => ({ me: me() }),
+				depends,
+				url: new URL('http://app.test/files')
+			})
+		);
+		expect(mine).toMatchObject({ scope: 'mine', after: null });
+
+		const error = await rejection(
+			filesLoad(
+				loadEvent({
+					fetch: mockFetch(problem(403, 'forbidden')),
+					parent: async () => ({ me: me() }),
+					depends: vi.fn(),
+					url: new URL('http://app.test/files?scope=all')
 				})
 			)
 		);

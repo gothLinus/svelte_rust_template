@@ -17,6 +17,8 @@ error-invalid-token = dieser Link ist ungültig oder abgelaufen
 error-invalid-passkey = dieser Passkey konnte nicht überprüft werden
 error-provider-unavailable = der Anmeldeanbieter ist nicht erreichbar, versuchen Sie es erneut
 error-busy = der Server ist ausgelastet, versuchen Sie es gleich noch einmal
+# incomplete_upload: der Client hat aufgehört, die Datei zu senden, bevor sie zu Ende war.
+error-incomplete-upload = der Upload wurde abgebrochen, bevor die ganze Datei angekommen war
 # Wird bei jedem unerwarteten Fehler angezeigt; die Ursache steht nur im Server-Log.
 error-internal = ein unerwarteter Fehler ist aufgetreten
 

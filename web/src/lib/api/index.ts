@@ -1,6 +1,7 @@
 import { adminApi } from './admin';
 import { authApi } from './auth';
 import { ApiClient } from './client';
+import { filesApi } from './files';
 import { meApi } from './me';
 import { notesApi } from './notes';
 
@@ -43,6 +44,8 @@ export type { FieldError, ProblemDetails } from './errors';
 export type { ListUsersQuery } from './admin';
 export type { SignedIn } from './me';
 export type { ListNotesQuery, NoteScope } from './notes';
+export type { FileScope, ListFilesQuery } from './files';
+export { UPLOAD_TIMEOUT_MS, contentUrl } from './files';
 export { oauthLinkUrl, oauthUrl } from './auth';
 export type { LoginResult, RegisterResult } from './auth';
 
@@ -56,6 +59,7 @@ export function createApi(fetchFn?: typeof fetch) {
 		auth: authApi(client),
 		me: meApi(client),
 		notes: notesApi(client),
+		files: filesApi(client),
 		admin: adminApi(client)
 	};
 }

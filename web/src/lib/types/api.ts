@@ -8,6 +8,7 @@ export * from './generated/api/v1/admin_pb';
 export * from './generated/api/v1/audit_pb';
 export * from './generated/api/v1/auth_pb';
 export * from './generated/api/v1/common_pb';
+export * from './generated/api/v1/files_pb';
 export * from './generated/api/v1/mfa_pb';
 export * from './generated/api/v1/notes_pb';
 export * from './generated/api/v1/oauth_pb';

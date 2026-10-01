@@ -18,6 +18,8 @@ error-invalid-token = this link is invalid or has expired
 error-invalid-passkey = this passkey could not be verified
 error-provider-unavailable = the sign-in provider could not be reached, try again
 error-busy = the server is busy, try again in a moment
+# incomplete_upload: the client stopped sending the file before its end.
+error-incomplete-upload = the upload stopped before the whole file arrived
 # Shown for every unexpected failure; the cause is only in the server log.
 error-internal = an unexpected error occurred
 

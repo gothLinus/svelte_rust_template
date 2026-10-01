@@ -8,6 +8,7 @@ http-status-403 = Forbidden
 http-status-404 = Not Found
 http-status-405 = Method Not Allowed
 http-status-409 = Conflict
+http-status-411 = Length Required
 http-status-412 = Precondition Failed
 http-status-413 = Payload Too Large
 http-status-415 = Unsupported Media Type
@@ -30,6 +31,8 @@ http-unsupported-media-type = expected a request with `Content-Type: { $type }`
 http-invalid-body = the body is not a valid message
 http-invalid-request = the request could not be read
 http-payload-too-large = the request body is too large
+# length_required: an upload without a Content-Length header, for developers of API clients.
+http-length-required = uploads need a Content-Length header
 http-invalid-query = the query string is not valid
 # For developers of API clients. X-Requested-With is a header name, do not translate it.
 http-csrf-header-required = state-changing requests need an X-Requested-With header

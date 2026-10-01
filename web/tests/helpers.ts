@@ -17,6 +17,8 @@ import {
 	type Note,
 	NoteSchema,
 	Permission,
+	type StoredFile,
+	StoredFileSchema,
 	type User,
 	UserSchema
 } from '$lib/types/api';
@@ -71,6 +73,24 @@ export function note(ownerId = USER_ID, overrides: MessageInitShape<typeof NoteS
 		createdAt: ts('2026-01-01T00:00:00Z'),
 		updatedAt: ts('2026-01-01T00:00:00Z'),
 		version: '1',
+		...overrides
+	});
+}
+
+export const FILE_USER = [Permission.FILES_READ, Permission.FILES_WRITE];
+
+export function storedFile(
+	ownerId = USER_ID,
+	overrides: MessageInitShape<typeof StoredFileSchema> = {}
+): StoredFile {
+	return create(StoredFileSchema, {
+		id: '01900000-0000-7000-8000-0000000000f1',
+		ownerId,
+		name: 'report.pdf',
+		contentType: 'application/pdf',
+		size: 1536n,
+		createdAt: ts('2026-01-01T00:00:00Z'),
+		updatedAt: ts('2026-01-01T00:00:00Z'),
 		...overrides
 	});
 }

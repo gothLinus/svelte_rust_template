@@ -10,6 +10,7 @@ import {
 	hasAnyPermission,
 	hasPermission,
 	loginUrl,
+	filePolicy,
 	notePolicy,
 	ownerOr,
 	redirectIfSignedIn,
@@ -18,7 +19,7 @@ import {
 	safeRedirect
 } from '$lib/auth';
 import { Permission } from '$lib/types/api';
-import { OTHER_ID, USER_ID, me, note } from '../helpers';
+import { OTHER_ID, USER_ID, me, note, storedFile } from '../helpers';
 
 function thrown(fn: () => unknown): unknown {
 	try {
@@ -74,6 +75,32 @@ describe('permissions', () => {
 		expect(notePolicy(manager, 'update')).toBe(false);
 
 		expect(notePolicy(null, 'read')).toBe(false);
+	});
+
+	it('mirrors the file policy', () => {
+		const user = me([Permission.FILES_READ, Permission.FILES_WRITE]);
+		const reader = me([Permission.FILES_READ]);
+		const manager = me([Permission.FILES_MANAGE]);
+		const own = storedFile(USER_ID);
+		const foreign = storedFile(OTHER_ID);
+
+		expect(filePolicy(user, 'read')).toBe(true);
+		expect(filePolicy(user, 'create')).toBe(true);
+		expect(filePolicy(user, 'read', own)).toBe(true);
+		expect(filePolicy(user, 'update', own)).toBe(true);
+		expect(filePolicy(user, 'delete', foreign)).toBe(false);
+		expect(filePolicy(user, 'read', foreign)).toBe(false);
+
+		expect(filePolicy(reader, 'read', own)).toBe(true);
+		expect(filePolicy(reader, 'delete', own)).toBe(false);
+		expect(filePolicy(reader, 'create')).toBe(false);
+
+		expect(filePolicy(manager, 'read')).toBe(true);
+		expect(filePolicy(manager, 'delete', foreign)).toBe(true);
+		expect(filePolicy(manager, 'create')).toBe(false);
+		expect(filePolicy(manager, 'update')).toBe(false);
+
+		expect(filePolicy(null, 'read')).toBe(false);
 	});
 });
 

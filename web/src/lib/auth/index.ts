@@ -8,7 +8,7 @@ export {
 	requireUser,
 	safeRedirect
 } from './guards';
-export { hasAnyPermission, hasPermission, notePolicy, ownerOr } from './permissions';
+export { filePolicy, hasAnyPermission, hasPermission, notePolicy, ownerOr } from './permissions';
 export type { Action, Owned, Policy } from './permissions';
 export { handleApiError } from './api-errors';
 export { ReauthPrompt, reauth } from './reauth.svelte';

@@ -1,10 +1,13 @@
 import { type Timestamp, timestampDate } from '@bufbuild/protobuf/wkt';
 import { i18n, t } from '$lib/i18n';
 
+const BYTE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
+
 interface Formats {
 	date: Intl.DateTimeFormat;
 	dateTime: Intl.DateTimeFormat;
 	relative: Intl.RelativeTimeFormat;
+	bytes: Intl.NumberFormat[];
 }
 
 const formats = new Map<string, Formats>();
@@ -16,7 +19,16 @@ function current(): Formats {
 		found = {
 			date: new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
 			dateTime: new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }),
-			relative: new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+			relative: new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
+			bytes: BYTE_UNITS.map(
+				(unit) =>
+					new Intl.NumberFormat(locale, {
+						style: 'unit',
+						unit,
+						unitDisplay: 'short',
+						maximumFractionDigits: unit === 'byte' ? 0 : 1
+					})
+			)
 		};
 		formats.set(locale, found);
 	}
@@ -53,6 +65,16 @@ export function formatRelative(timestamp: Timestamp | undefined, now = Date.now(
 		if (Math.abs(seconds) >= size) return relative.format(Math.round(seconds / size), unit);
 	}
 	return relative.format(0, 'second');
+}
+
+export function formatBytes(bytes: number | bigint): string {
+	let value = Number(bytes);
+	let unit = 0;
+	while (value >= 1024 && unit < BYTE_UNITS.length - 1) {
+		value /= 1024;
+		unit += 1;
+	}
+	return current().bytes[unit]!.format(value);
 }
 
 export function initials(name: string): string {

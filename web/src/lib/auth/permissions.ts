@@ -1,5 +1,5 @@
 import type { SignedIn } from '$lib/api';
-import { type Note, Permission } from '$lib/types/api';
+import { type Note, type StoredFile, Permission } from '$lib/types/api';
 
 /**
  * Permission checks for the UI: which links, buttons and pages to show.
@@ -57,5 +57,19 @@ export const notePolicy: Policy<Note> = (me, action, note) => {
 		case 'update':
 		case 'delete':
 			return note ? ownerOr(me, note, Permission.NOTES_WRITE, Permission.NOTES_MANAGE) : false;
+	}
+};
+
+export const filePolicy: Policy<StoredFile> = (me, action, file) => {
+	switch (action) {
+		case 'read':
+			return file
+				? ownerOr(me, file, Permission.FILES_READ, Permission.FILES_MANAGE)
+				: hasAnyPermission(me, Permission.FILES_READ, Permission.FILES_MANAGE);
+		case 'create':
+			return hasPermission(me, Permission.FILES_WRITE);
+		case 'update':
+		case 'delete':
+			return file ? ownerOr(me, file, Permission.FILES_WRITE, Permission.FILES_MANAGE) : false;
 	}
 };

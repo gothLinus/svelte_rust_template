@@ -5,6 +5,7 @@ import {
 	asSentence,
 	describeUserAgent,
 	excerpt,
+	formatBytes,
 	formatDate,
 	formatDateTime,
 	formatRelative,
@@ -38,6 +39,18 @@ describe('format', () => {
 		expect(formatRelative(ts('2026-06-15T11:55:00Z'), now)).toBe('5 minutes ago');
 		expect(formatRelative(ts('2026-06-14T12:00:00Z'), now)).toBe('yesterday');
 		expect(formatRelative(ts('2026-06-29T12:00:00Z'), now)).toBe('in 2 weeks');
+	});
+
+	it('formats sizes in binary steps', async () => {
+		expect(formatBytes(0)).toBe('0 byte');
+		expect(formatBytes(512n)).toBe('512 byte');
+		expect(formatBytes(1536n)).toBe('1.5 kB');
+		expect(formatBytes(25 * 1024 * 1024)).toBe('25 MB');
+		expect(formatBytes(1024n ** 3n)).toBe('1 GB');
+		expect(formatBytes(1024n ** 5n)).toBe('1,024 TB');
+
+		await useGerman();
+		expect(formatBytes(1536n)).toBe('1,5 kB');
 	});
 
 	it('formats dates', () => {
