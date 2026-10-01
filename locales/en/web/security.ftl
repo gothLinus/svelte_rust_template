@@ -39,8 +39,8 @@ security-passkeys-never-used = Added { $added } · never used
 security-passkeys-add = Add a passkey
 security-passkeys-added = Passkey added.
 security-passkeys-unsupported = This browser does not support passkeys.
-# { $name } is the passkey's name.
 security-passkeys-rename = Rename
+# { $name } is the passkey's name.
 security-passkeys-rename-label = Rename { $name }
 security-passkeys-rename-title = Rename passkey
 security-passkeys-name = Name
@@ -108,7 +108,7 @@ security-recovery-file-title = { $app } recovery codes
 ## Sessions
 
 security-sessions-title = Active sessions
-security-sessions-description = Signed-in browsers and devices. Sign out any you do not recognise.
+security-sessions-description = Signed-in browsers and devices. Sign out any you do not recognize.
 security-sessions-current = This device
 # { $when } is a relative time like "5 minutes ago".
 security-sessions-active = Active { $when }

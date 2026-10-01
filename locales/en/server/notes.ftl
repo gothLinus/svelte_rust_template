@@ -3,10 +3,16 @@
 ## Each has a stable `code` (in the comment) that clients can act on.
 
 # too_long. { $max } is a number of characters.
-note-title-too-long = must be at most { $max } characters
+note-title-too-long = must be at most { $max ->
+        [one] { $max } character
+       *[other] { $max } characters
+    }
 # invalid_characters
 note-title-single-line = must be a single line without control characters
 # too_long. { $max } is a number of characters.
-note-body-too-long = must be at most { $max } characters
+note-body-too-long = must be at most { $max ->
+        [one] { $max } character
+       *[other] { $max } characters
+    }
 # invalid_characters
 note-body-control-characters = must not contain control characters

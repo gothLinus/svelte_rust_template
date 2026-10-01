@@ -9,6 +9,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import { asSentence } from '$lib/helpers/format';
 	import { t } from '$lib/i18n';
 	import { site } from '$lib/helpers/site.svelte';
 	import { takeToken } from '$lib/helpers/token';
@@ -49,7 +50,7 @@
 			<Card.Title class="text-lg"><h1>{t('confirm-failed-title')}</h1></Card.Title>
 			<Card.Description>
 				{t('confirm-failed-description', {
-					reason: status.message,
+					reason: asSentence(status.message),
 					hours: lifetimes(page.data.methods).emailChangeHours
 				})}
 			</Card.Description>

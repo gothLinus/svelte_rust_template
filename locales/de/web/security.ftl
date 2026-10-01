@@ -39,8 +39,8 @@ security-passkeys-never-used = Hinzugefügt am { $added } · nie verwendet
 security-passkeys-add = Passkey hinzufügen
 security-passkeys-added = Passkey hinzugefügt.
 security-passkeys-unsupported = Dieser Browser unterstützt keine Passkeys.
-# { $name } ist der Name des Passkeys.
 security-passkeys-rename = Umbenennen
+# { $name } ist der Name des Passkeys.
 security-passkeys-rename-label = { $name } umbenennen
 security-passkeys-rename-title = Passkey umbenennen
 security-passkeys-name = Name

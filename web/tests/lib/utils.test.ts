@@ -2,6 +2,7 @@ import { isHttpError } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '$lib/api';
 import {
+	asSentence,
 	describeUserAgent,
 	excerpt,
 	formatDate,
@@ -20,6 +21,14 @@ import { site } from '$lib/helpers/site.svelte';
 import { me, ts, useEnglish, useGerman } from '../helpers';
 
 describe('format', () => {
+	it('makes a server message a sentence of its own', () => {
+		expect(asSentence('this link is invalid or has expired')).toBe(
+			'This link is invalid or has expired.'
+		);
+		expect(asSentence('  Already a sentence!  ')).toBe('Already a sentence!');
+		expect(asSentence('')).toBe('');
+	});
+
 	const now = Date.parse('2026-06-15T12:00:00Z');
 
 	afterEach(useEnglish);

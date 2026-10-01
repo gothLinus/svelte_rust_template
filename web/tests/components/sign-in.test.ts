@@ -184,6 +184,9 @@ describe('magic link', () => {
 		vi.stubGlobal('fetch', mockFetch(problem(400, 'invalid_token')));
 		render(MagicLink);
 		await user.click(await screen.findByRole('button', { name: t('magic-continue') }));
-		expect(await screen.findByText(/problem invalid_token/)).toBeInTheDocument();
+		// The server's lowercase detail is made a sentence before the advice that follows it.
+		expect(
+			await screen.findByText((text) => text.startsWith('Problem invalid_token. '))
+		).toBeInTheDocument();
 	});
 });

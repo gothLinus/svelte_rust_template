@@ -9,6 +9,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import { asSentence } from '$lib/helpers/format';
 	import { t } from '$lib/i18n';
 	import { site } from '$lib/helpers/site.svelte';
 	import { takeToken } from '$lib/helpers/token';
@@ -48,7 +49,7 @@
 			<Card.Title class="text-lg"><h1>{t('magic-failed-title')}</h1></Card.Title>
 			<Card.Description>
 				{t('magic-failed-description', {
-					reason: status.message,
+					reason: asSentence(status.message),
 					minutes: lifetimes(page.data.methods).signInMinutes
 				})}
 			</Card.Description>
