@@ -1,14 +1,10 @@
 //! Readiness: can the application serve requests right now? [`HealthService::ready`] pings the
-//! database, and `api::routes::health` serves the answer as `/health/ready`, next to
-//! `/health/live`, which checks nothing and needs no service.
+//! database and the object store, and `api::routes::health` serves the answer as
+//! `/health/ready`, next to `/health/live`, which checks nothing and needs no service.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use domain::{
-    clock::Clock,
-    database::Database,
-    error::{ErrorChain, StorageError},
-};
+use domain::{clock::Clock, database::Database, error::ErrorChain, object_store::ObjectStore};
 use serde::Serialize;
 use time::{Duration, OffsetDateTime};
 
@@ -42,8 +38,9 @@ impl<A: Adapters> HealthService<A> {
         }
     }
 
-    /// Ready when the database answers, as of at most a second ago. A failed ping is
-    /// logged and reported as `Unavailable`.
+    /// Ready when the database and the object store answer, as of at most a second ago. A failed
+    /// ping is logged and reported as `Unavailable`. Without the store, uploads and downloads
+    /// fail, so a replica that cannot reach it is taken out of rotation too.
     pub async fn ready(&self) -> HealthStatus {
         let now = self.ctx.clock.now();
         let cached = *self.last.lock().unwrap_or_else(PoisonError::into_inner);
@@ -51,17 +48,18 @@ impl<A: Adapters> HealthService<A> {
             return status;
         }
         let status = match self.ctx.db.ping().await {
-            Ok(()) => HealthStatus::Ok,
-            Err(err) => {
-                log_unavailable(&err);
-                HealthStatus::Unavailable
-            }
+            Ok(()) => match self.ctx.objects.ping().await {
+                Ok(()) => HealthStatus::Ok,
+                Err(err) => unavailable("object store", &err),
+            },
+            Err(err) => unavailable("database", &err),
         };
         *self.last.lock().unwrap_or_else(PoisonError::into_inner) = Some((now, status));
         status
     }
 }
 
-fn log_unavailable(err: &StorageError) {
-    tracing::warn!(error = %ErrorChain(err), "readiness check failed");
+fn unavailable(dependency: &str, err: &(dyn std::error::Error + 'static)) -> HealthStatus {
+    tracing::warn!(dependency, error = %ErrorChain(err), "readiness check failed");
+    HealthStatus::Unavailable
 }

@@ -100,6 +100,10 @@ impl ObjectStore for FakeObjects {
         self.objects.lock().unwrap().remove(key);
         Ok(())
     }
+
+    async fn ping(&self) -> Result<(), ObjectStoreError> {
+        self.check_up()
+    }
 }
 
 #[derive(Clone)]

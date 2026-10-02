@@ -42,6 +42,8 @@ pub mod signing;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
+/// A readiness probe must answer quickly, whatever the store does.
+const PING_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// The store answered with an error status. `code` is S3's error code (`AccessDenied`,
 /// `NoSuchBucket`), when its XML body had one.
@@ -272,6 +274,24 @@ impl ObjectStore for S3ObjectStore {
             Ok(())
         } else {
             Err(rejected(response).await)
+        }
+    }
+
+    async fn ping(&self) -> Result<(), ObjectStoreError> {
+        let head = self
+            .inner
+            .send(Method::HEAD, self.inner.bucket_url.clone(), None, &[], None);
+        let response = tokio::time::timeout(PING_TIMEOUT, head)
+            .await
+            .map_err(ObjectStoreError::backend)??;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            // A HEAD response has no body to read a code from.
+            Err(ObjectStoreError::backend(S3Error {
+                status: response.status(),
+                code: None,
+            }))
         }
     }
 }

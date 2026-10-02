@@ -740,6 +740,19 @@ async fn readiness_is_checked_at_most_once_a_second() {
 }
 
 #[tokio::test]
+async fn not_ready_while_the_object_store_is_down() {
+    use application::health::HealthStatus;
+
+    let fx = Fixture::new();
+    fx.objects.set_down(true);
+    assert_eq!(fx.services.health.ready().await, HealthStatus::Unavailable);
+
+    fx.objects.set_down(false);
+    fx.clock.advance(Duration::seconds(1));
+    assert_eq!(fx.services.health.ready().await, HealthStatus::Ok);
+}
+
+#[tokio::test]
 async fn maintenance_deletes_expired_sessions_and_tokens() {
     let fx = Fixture::new();
     fx.register("alice@example.com").await;

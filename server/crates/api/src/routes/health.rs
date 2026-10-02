@@ -18,8 +18,8 @@ async fn live() -> Json<HealthDto> {
     })
 }
 
-/// The process can do useful work: the database answers (checked at most once a second). `503`
-/// otherwise, so a load balancer stops sending traffic until it recovers.
+/// The process can do useful work: the database and the object store answer (checked at most once
+/// a second). `503` otherwise, so a load balancer stops sending traffic until they recover.
 async fn ready<A: Adapters>(State(state): State<AppState<A>>) -> (StatusCode, Json<HealthDto>) {
     let status = state.services.health.ready().await;
     let code = match status {

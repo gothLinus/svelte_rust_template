@@ -314,6 +314,10 @@ impl ObjectStore for MemoryObjectStore {
             lock(&self.objects).remove(key);
         }))
     }
+
+    fn ping(&self) -> impl Future<Output = Result<(), ObjectStoreError>> + Send {
+        ready(self.check_up())
+    }
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {

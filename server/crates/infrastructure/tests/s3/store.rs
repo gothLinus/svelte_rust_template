@@ -37,6 +37,27 @@ async fn creates_a_missing_bucket_once() {
 }
 
 #[tokio::test]
+async fn ping_needs_the_bucket_and_the_credentials() {
+    let bucket = Bucket::new().await;
+    bucket.store.ping().await.unwrap();
+
+    let missing = S3ObjectStore::new(&new_bucket_config()).unwrap();
+    assert!(matches!(
+        missing.ping().await.unwrap_err(),
+        ObjectStoreError::Backend(_)
+    ));
+
+    let mut wrong = config();
+    wrong.secret_key = domain::secret::Secret::new("not-the-secret-key");
+    let refused = S3ObjectStore::new(&wrong).unwrap();
+    assert!(matches!(
+        refused.ping().await.unwrap_err(),
+        ObjectStoreError::Backend(_)
+    ));
+    bucket.remove(&[]).await;
+}
+
+#[tokio::test]
 async fn stores_reads_and_deletes_an_object() {
     let bucket = Bucket::new().await;
     let key = key();
@@ -172,6 +193,10 @@ async fn a_store_that_cannot_be_reached_is_a_backend_error() {
     ));
     assert!(matches!(
         store.delete(&key).await.unwrap_err(),
+        ObjectStoreError::Backend(_)
+    ));
+    assert!(matches!(
+        store.ping().await.unwrap_err(),
         ObjectStoreError::Backend(_)
     ));
     assert!(matches!(

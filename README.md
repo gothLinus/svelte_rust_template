@@ -133,6 +133,7 @@ from the same origin; in development Vite proxies `/api`.
 ## API
 
 - Everything is under `/api/v1`; `/health/live` and `/health/ready` sit outside it.
+  Readiness answers `503` while the database or the object store cannot be reached.
 - Bodies are Protocol Buffers (`application/x-protobuf`) defined in `proto/api/v1`. The
   server compiles them at build time; `just gen-types` generates the TypeScript.
 - Errors are always `application/problem+json`. Switch on the stable `code`; `title`,

@@ -162,6 +162,14 @@ pub trait ObjectStore: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Option<Object>, ObjectStoreError>> + Send;
 
     fn delete(&self, key: &ObjectKey) -> impl Future<Output = Result<(), ObjectStoreError>> + Send;
+
+    /// Whether the store answers and the bucket is there for these credentials, for the readiness
+    /// check. Reads and writes nothing.
+    ///
+    /// # Errors
+    ///
+    /// `Backend` if the store cannot be reached or refuses the bucket.
+    fn ping(&self) -> impl Future<Output = Result<(), ObjectStoreError>> + Send;
 }
 
 /// The queue of objects to remove from the [`ObjectStore`], kept in the database (see the module

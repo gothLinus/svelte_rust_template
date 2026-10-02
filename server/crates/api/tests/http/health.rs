@@ -28,3 +28,15 @@ async fn not_ready_without_a_database(pool: PgPool) {
     let live = app.send(TestRequest::get("/health/live")).await;
     assert_eq!(live.status, StatusCode::OK);
 }
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn not_ready_without_the_object_store(pool: PgPool) {
+    let app = TestApp::new(pool);
+    app.objects.set_down(true);
+
+    let ready = app.send(TestRequest::get("/health/ready")).await;
+    assert_eq!(ready.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(ready.body, json!({ "status": "unavailable" }));
+    let live = app.send(TestRequest::get("/health/live")).await;
+    assert_eq!(live.status, StatusCode::OK);
+}
