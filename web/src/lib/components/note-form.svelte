@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { api } from '$lib/api';
+	import { ApiError, STALE, api } from '$lib/api';
 	import FormError from '$lib/components/form-error.svelte';
 	import FormField from '$lib/components/form-field.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -16,6 +16,10 @@
 	/**
 	 * The inside of `NoteDialog`. The dialog mounts it each time it opens, so the fields
 	 * start from `note` (or blank) without copying state around.
+	 *
+	 * Saving sends the version the form started from. If someone changed the note since,
+	 * the form keeps what was typed, moves on to the newer version and says so; saving
+	 * again then replaces the other change on purpose.
 	 */
 	let {
 		note,
@@ -31,14 +35,25 @@
 	let title = $state(note?.title ?? '');
 	// svelte-ignore state_referenced_locally
 	let body = $state(note?.body ?? '');
+	// svelte-ignore state_referenced_locally
+	let version = $state(note?.version ?? '');
 	const form = new FormState(['title', 'body']);
+
+	async function save(editing: Note): Promise<Note> {
+		try {
+			return await api.notes.update(editing.id, version, { title, body });
+		} catch (error) {
+			if (!(error instanceof ApiError && error.code === STALE)) throw error;
+			version = (await api.notes.get(editing.id)).version;
+			throw new ApiError(error.status, STALE, t('note-stale'));
+		}
+	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		const editing = note;
 		const saved = await form.submit(
-			() =>
-				editing ? api.notes.update(editing.id, { title, body }) : api.notes.create({ title, body }),
+			() => (editing ? save(editing) : api.notes.create({ title, body })),
 			{ validation: validate({ title, body }, { title: rules.noteTitle, body: rules.noteBody }) }
 		);
 		if (saved) onsaved(saved, !editing);

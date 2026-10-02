@@ -24,7 +24,11 @@ use std::fmt::{self, Display, Formatter};
 use time::OffsetDateTime;
 
 use crate::{
-    error::ValidationError, i18n::Message, id::Id, pagination::NewestFirst, repository::Resource,
+    error::ValidationError,
+    i18n::Message,
+    id::Id,
+    pagination::NewestFirst,
+    repository::{Resource, Version, Versioned},
     user::UserId,
 };
 
@@ -113,6 +117,7 @@ pub struct Note {
     body: NoteBody,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
+    version: Version,
 }
 
 pub struct NoteParts {
@@ -122,6 +127,7 @@ pub struct NoteParts {
     pub body: NoteBody,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
+    pub version: Version,
 }
 
 impl Note {
@@ -133,6 +139,7 @@ impl Note {
             body: parts.body,
             created_at: parts.created_at,
             updated_at: parts.updated_at,
+            version: parts.version,
         }
     }
 
@@ -187,6 +194,12 @@ impl NoteChanges {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct NoteFilter {
     pub owner_id: Option<UserId>,
+}
+
+impl Versioned for Note {
+    fn version(&self) -> Version {
+        self.version
+    }
 }
 
 impl Resource for Note {

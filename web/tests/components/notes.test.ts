@@ -69,6 +69,7 @@ describe('note dialog', () => {
 		const [url, init] = callOf(fetchFn);
 		expect(url).toBe(`/api/v1/notes/${note().id}`);
 		expect(init.method).toBe('PATCH');
+		expect(init.headers).toMatchObject({ 'if-match': '"1"' });
 		expect(sent(fetchFn, UpdateNoteRequestSchema)).toEqual(
 			create(UpdateNoteRequestSchema, { title: 'Shopping', body: 'milk' })
 		);
@@ -92,6 +93,36 @@ describe('note dialog', () => {
 		const body = screen.getByLabelText(t('note-field-text'));
 		await vi.waitFor(() => expect(body).toHaveAccessibleDescription('must be shorter'));
 		expect(body).toHaveFocus();
+	});
+});
+
+describe('note dialog when someone else saved first', () => {
+	it('keeps the edits and saves them over the newer version on purpose', async () => {
+		const user = userEvent.setup();
+		const newer = note(undefined, { title: 'Theirs', version: '2' });
+		const saved = note(undefined, { title: 'Mine', version: '3' });
+		const fetchFn = mockFetch(
+			problem(412, 'stale'),
+			reply(NoteSchema, newer),
+			reply(NoteSchema, saved)
+		);
+		vi.stubGlobal('fetch', fetchFn);
+		const onsaved = vi.fn();
+		render(NoteDialog, { open: true, note: note(), onsaved });
+
+		const title = screen.getByLabelText(t('note-field-title'));
+		await user.clear(title);
+		await user.type(title, 'Mine');
+		await user.click(screen.getByRole('button', { name: t('note-save') }));
+
+		expect(await screen.findByText(t('note-stale'))).toBeInTheDocument();
+		expect(onsaved).not.toHaveBeenCalled();
+		expect(title).toHaveValue('Mine');
+		expect(callOf(fetchFn, 1)[1].method ?? 'GET').toBe('GET');
+
+		await user.click(screen.getByRole('button', { name: t('note-save') }));
+		await vi.waitFor(() => expect(onsaved).toHaveBeenCalledWith(saved, false));
+		expect(callOf(fetchFn, 2)[1].headers).toMatchObject({ 'if-match': '"2"' });
 	});
 });
 

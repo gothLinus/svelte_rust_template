@@ -6,6 +6,7 @@ use application::{
 use domain::{
     note::{Note, NoteBody, NoteFilter, NoteId, NoteParts, NoteTitle},
     rbac::{Permission, PermissionSet},
+    repository::Version,
     session::{ClientInfo, SessionId},
     user::UserId,
 };
@@ -30,6 +31,7 @@ fn note_of(owner: UserId) -> Note {
         body: NoteBody::default(),
         created_at: OffsetDateTime::UNIX_EPOCH,
         updated_at: OffsetDateTime::UNIX_EPOCH,
+        version: Version::FIRST,
     })
 }
 

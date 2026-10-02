@@ -4,7 +4,7 @@ import {
 	NoteSchema,
 	UpdateNoteRequestSchema
 } from '$lib/types/api';
-import { type ApiClient, type Init, encode, message, segment } from './client';
+import { type ApiClient, type Init, encode, ifMatch, message, segment } from './client';
 
 export type NoteScope = 'mine' | 'all';
 
@@ -24,12 +24,15 @@ export function notesApi(client: ApiClient) {
 				body: encode(CreateNoteRequestSchema, body),
 				response: message(NoteSchema)
 			}),
-		update: (id: string, body: Init<typeof UpdateNoteRequestSchema>) =>
+		/** Changes `version` of the note only; `STALE` if someone changed it since. */
+		update: (id: string, version: string, body: Init<typeof UpdateNoteRequestSchema>) =>
 			client.patch(`/notes/${segment(id)}`, {
 				body: encode(UpdateNoteRequestSchema, body),
+				headers: ifMatch(version),
 				response: message(NoteSchema)
 			}),
-		remove: (id: string) => client.delete(`/notes/${segment(id)}`),
+		remove: (id: string, version: string) =>
+			client.delete(`/notes/${segment(id)}`, { headers: ifMatch(version) }),
 		duplicate: (id: string) =>
 			client.post(`/notes/${segment(id)}/duplicate`, { response: message(NoteSchema) })
 	};

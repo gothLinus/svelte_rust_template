@@ -7,7 +7,7 @@
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api, errorMessage } from '$lib/api';
+	import { ApiError, STALE, api, errorMessage } from '$lib/api';
 	import { notePolicy, session, tabSync } from '$lib/auth';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import CursorPagination from '$lib/components/cursor-pagination.svelte';
@@ -71,11 +71,13 @@
 		const note = deleting;
 		if (!note) return;
 		try {
-			await api.notes.remove(note.id);
+			await api.notes.remove(note.id, note.version);
 			toast.success(t('notes-deleted', { title: note.title }));
 			await tabSync.refresh(NOTES);
 		} catch (error) {
 			toast.error(errorMessage(error));
+			// A `stale` note changed since the list was loaded: show the current one.
+			if (error instanceof ApiError && error.code === STALE) await tabSync.refresh(NOTES);
 		}
 	}
 

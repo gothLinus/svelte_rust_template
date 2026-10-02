@@ -1,7 +1,7 @@
 use domain::{
     note::{NewNote, Note, NoteBody, NoteChanges, NoteFilter, NoteId, NoteTitle},
     pagination::{PageRequest, PageSize},
-    repository::Repository,
+    repository::{Repository, Version, Versioned},
     user::User,
 };
 use sqlx::PgPool;
@@ -51,12 +51,15 @@ async fn crud(pool: PgPool) {
     assert_eq!(updated.title().as_str(), "Groceries");
     assert_eq!(updated.body().as_str(), "milk");
     assert!(updated.updated_at() > created.updated_at());
+    assert_eq!(created.version(), Version::FIRST);
+    assert_eq!(updated.version(), Version::FIRST.next());
 
     let unchanged = Repository::<Note>::update(&mut conn, created.id(), &NoteChanges::default())
         .await
         .unwrap()
         .unwrap();
     assert_eq!(unchanged.updated_at(), updated.updated_at());
+    assert_eq!(unchanged.version(), updated.version());
 
     assert!(
         Repository::<Note>::delete(&mut conn, created.id())

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use domain::{
     database::{Database, Transaction},
     note::{Note, NoteId},
+    repository::Version,
 };
 
 use crate::{
@@ -24,7 +25,8 @@ use crate::{
 /// work, in one transaction when it writes.
 ///
 /// Each method takes the [`Actor`] of the request and returns a response DTO; the failures are
-/// those of [`CrudService`] (`NotFound`, `Forbidden`, `Validation`).
+/// those of [`CrudService`] (`NotFound`, `Forbidden`, `Validation`, and `Stale` for an outdated
+/// `expected` version).
 pub struct NoteService<A: Adapters> {
     crud: CrudService<A, Note, NotePolicy>,
 }
@@ -58,17 +60,25 @@ impl<A: Adapters> NoteService<A> {
         self.crud.create(actor, request).await
     }
 
+    /// `expected` is the version the client read (`If-Match`); `Stale` if the note has changed
+    /// since. `None` updates whatever is there.
     pub async fn update(
         &self,
         actor: &Actor,
         id: NoteId,
+        expected: Option<Version>,
         request: UpdateNoteRequest,
     ) -> Result<NoteDto, AppError> {
-        self.crud.update(actor, id, request).await
+        self.crud.update_if(actor, id, expected, request).await
     }
 
-    pub async fn delete(&self, actor: &Actor, id: NoteId) -> Result<(), AppError> {
-        self.crud.delete(actor, id).await
+    pub async fn delete(
+        &self,
+        actor: &Actor,
+        id: NoteId,
+        expected: Option<Version>,
+    ) -> Result<(), AppError> {
+        self.crud.delete_if(actor, id, expected).await
     }
 
     /// A copy of a note the actor can see, owned by the actor. An example of a use case beyond

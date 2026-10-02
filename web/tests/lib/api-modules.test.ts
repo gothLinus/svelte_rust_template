@@ -322,8 +322,8 @@ describe('notes', () => {
 		await api.notes.list();
 		await api.notes.get('n1');
 		await api.notes.create({ title: 'x' });
-		await api.notes.update('n1', { body: 'y' });
-		await api.notes.remove('n1');
+		await api.notes.update('n1', '3', { body: 'y' });
+		await api.notes.remove('n1', '4');
 		await api.notes.duplicate('n1');
 
 		expect(page.items).toEqual([note()]);
@@ -331,6 +331,8 @@ describe('notes', () => {
 		expect(sent(fetchFn, UpdateNoteRequestSchema, 4)).toEqual(
 			create(UpdateNoteRequestSchema, { body: 'y' })
 		);
+		expect(callOf(fetchFn, 4)[1].headers).toMatchObject({ 'if-match': '"3"' });
+		expect(callOf(fetchFn, 5)[1].headers).toMatchObject({ 'if-match': '"4"' });
 		expect(
 			fetchFn.mock.calls.map(
 				([url, init]) => `${init?.method} ${String(url).replace(API_BASE, '')}`

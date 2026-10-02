@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            insert into notes (id, owner_id, title, body)\n            values ($1, $2, $3, $4)\n            returning id, owner_id, title, body, created_at, updated_at\n            ",
+  "query": "\n            select id, owner_id, title, body, created_at, updated_at, version\n            from notes\n            where id = $1\n            for update\n            ",
   "describe": {
     "columns": [
       {
@@ -68,14 +68,22 @@
             "name": "updated_at"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "notes",
+            "name": "version"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
-        "Text",
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -84,8 +92,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "a2089c0182c3f8469c695d360e23748dba913abd8f345472aa6872724cb6ae8f"
+  "hash": "c2a7d5ff3f1c44d895e927a42dbd86536702a57f39020c457ffa36a666c2ad85"
 }

@@ -51,3 +51,5 @@ note-field-title = Title
 note-field-text = Text
 note-save = Save changes
 note-create = Create note
+# Saving hit a newer version of the note (the server answered `stale`).
+note-stale = Someone else changed this note meanwhile. Save again to replace their changes with yours, or cancel to keep theirs.

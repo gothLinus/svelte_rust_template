@@ -19,7 +19,7 @@ use domain::{
     pagination::{Cursor, Page, PageRequest},
     passkey::{Passkey, WebAuthnChallenge},
     rbac::{Permission, PermissionSet, RbacRepository, Role, RoleName},
-    repository::Repository,
+    repository::{Repository, Version, Versioned},
     secret::TokenHash,
     session::{AuthenticatedSession, Session, SessionId, SessionParts, SessionRepository},
     user::{
@@ -874,6 +874,7 @@ impl Repository<Note> for Mem {
                 body: input.body.clone(),
                 created_at: START,
                 updated_at: START,
+                version: Version::FIRST,
             });
             state.notes.insert(note.id(), note.clone());
             Ok(note)
@@ -889,16 +890,25 @@ impl Repository<Note> for Mem {
             let Some(note) = state.notes.get_mut(&id) else {
                 return Ok(None);
             };
+            let title = changes
+                .title
+                .clone()
+                .unwrap_or_else(|| note.title().clone());
+            let body = changes.body.clone().unwrap_or_else(|| note.body().clone());
+            // Like the `bump_version` trigger: only a real change moves the version on.
+            let version = if (&title, &body) == (note.title(), note.body()) {
+                note.version()
+            } else {
+                note.version().next()
+            };
             *note = Note::from_parts(NoteParts {
                 id: note.id(),
                 owner_id: note.owner_id(),
-                title: changes
-                    .title
-                    .clone()
-                    .unwrap_or_else(|| note.title().clone()),
-                body: changes.body.clone().unwrap_or_else(|| note.body().clone()),
+                title,
+                body,
                 created_at: note.created_at(),
                 updated_at: note.updated_at(),
+                version,
             });
             Ok(Some(note.clone()))
         })

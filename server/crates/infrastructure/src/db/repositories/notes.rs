@@ -5,8 +5,9 @@
 //!
 //! - `domain::note`: the entity, its `Resource` impl and its validated value types.
 //! - `application::notes`: the DTOs, the policy and the `CrudService` that call this repository.
-//! - this file, plus the migration `migrations/*_notes.up.sql` (table, the index the list query
-//!   relies on, the `set_updated_at` trigger).
+//! - this file, plus the migrations `migrations/*_notes.up.sql` (table, the index the list query
+//!   relies on, the `set_updated_at` trigger) and `*_note_versions.up.sql` (the `version` column
+//!   and its `bump_version` trigger).
 //! - `api` routes and wire conversions (`api::routes::notes`, `api::wire::notes`) and
 //!   `proto/api/v1/notes.proto`.
 //!
@@ -23,8 +24,8 @@
 //!    with orders other than `NewestFirst` matches on `page.sort` and builds its cursors with
 //!    `Cursor::keyset`.
 //! 5. `create` inserts with the id the caller generated and returns the stored row; `update`
-//!    applies the present fields with `coalesce` and returns `None` if the row is gone; `delete`
-//!    reports whether a row was deleted.
+//!    applies the present fields with `coalesce` and returns `None` if the row is gone (the
+//!    `bump_version` trigger moves `version` on); `delete` reports whether a row was deleted.
 //! 6. Queries are checked at compile time. After adding or changing one, run `just sqlx-prepare`
 //!    and commit the updated `.sqlx/` cache so builds without a database still work.
 
@@ -32,7 +33,7 @@ use domain::{
     error::StorageError,
     note::{NewNote, Note, NoteBody, NoteChanges, NoteFilter, NoteId, NoteParts, NoteTitle},
     pagination::{Cursor, NewestFirst, Page, PageRequest},
-    repository::Repository,
+    repository::{Repository, Version},
     user::UserId,
 };
 use time::OffsetDateTime;
@@ -50,6 +51,7 @@ struct NoteRow {
     body: String,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
+    version: i64,
 }
 
 impl TryFrom<NoteRow> for Note {
@@ -63,6 +65,7 @@ impl TryFrom<NoteRow> for Note {
             body: NoteBody::parse(&row.body).map_err(corrupt)?,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            version: Version::new(row.version),
         }))
     }
 }
@@ -72,7 +75,7 @@ impl<C: PgHandle> Repository<Note> for PgExecutor<C> {
         sqlx::query_as!(
             NoteRow,
             r#"
-            select id, owner_id, title, body, created_at, updated_at
+            select id, owner_id, title, body, created_at, updated_at, version
             from notes
             where id = $1
             "#,
@@ -89,7 +92,7 @@ impl<C: PgHandle> Repository<Note> for PgExecutor<C> {
         sqlx::query_as!(
             NoteRow,
             r#"
-            select id, owner_id, title, body, created_at, updated_at
+            select id, owner_id, title, body, created_at, updated_at, version
             from notes
             where id = $1
             for update
@@ -124,7 +127,7 @@ impl<C: PgHandle> Repository<Note> for PgExecutor<C> {
                 sqlx::query_as!(
                     NoteRow,
                     r#"
-                    select id, owner_id, title, body, created_at, updated_at
+                    select id, owner_id, title, body, created_at, updated_at, version
                     from notes
                     where owner_id = $1 and id < $2
                     order by id desc
@@ -141,7 +144,7 @@ impl<C: PgHandle> Repository<Note> for PgExecutor<C> {
                 sqlx::query_as!(
                     NoteRow,
                     r#"
-                    select id, owner_id, title, body, created_at, updated_at
+                    select id, owner_id, title, body, created_at, updated_at, version
                     from notes
                     where id < $1
                     order by id desc
@@ -170,7 +173,7 @@ impl<C: PgHandle> Repository<Note> for PgExecutor<C> {
             r#"
             insert into notes (id, owner_id, title, body)
             values ($1, $2, $3, $4)
-            returning id, owner_id, title, body, created_at, updated_at
+            returning id, owner_id, title, body, created_at, updated_at, version
             "#,
             id.as_uuid(),
             input.owner_id.as_uuid(),
@@ -194,7 +197,7 @@ impl<C: PgHandle> Repository<Note> for PgExecutor<C> {
             update notes
             set title = coalesce($2, title), body = coalesce($3, body)
             where id = $1
-            returning id, owner_id, title, body, created_at, updated_at
+            returning id, owner_id, title, body, created_at, updated_at, version
             "#,
             id.as_uuid(),
             changes.title.as_ref().map(NoteTitle::as_str),

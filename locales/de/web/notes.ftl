@@ -51,3 +51,4 @@ note-field-title = Titel
 note-field-text = Text
 note-save = Änderungen speichern
 note-create = Notiz erstellen
+note-stale = Jemand anderes hat diese Notiz zwischenzeitlich geändert. Speichern Sie erneut, um deren Änderungen durch Ihre zu ersetzen, oder brechen Sie ab, um sie zu behalten.

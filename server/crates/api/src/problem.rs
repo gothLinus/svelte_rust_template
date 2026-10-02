@@ -230,6 +230,7 @@ fn title(status: StatusCode) -> Message {
         404 => "http-status-404",
         405 => "http-status-405",
         409 => "http-status-409",
+        412 => "http-status-412",
         413 => "http-status-413",
         415 => "http-status-415",
         422 => "http-status-422",
@@ -259,7 +260,7 @@ impl IntoResponse for ApiError {
 /// Maps each [`AppError`] to a status and its stable [`AppError::code`]: `422` for validation (with
 /// the invalid fields), `401` for missing or wrong credentials, `403` for refused access
 /// (including an unverified email, a disabled account and a required re-authentication), `404`,
-/// `409`, `400` for a bad token or passkey, `502` when a social
+/// `412` when an `If-Match` version is stale, `409`, `400` for a bad token or passkey, `502` when a social
 /// provider is down, `503` (with `Retry-After`) when the server is busy, and `500` for everything
 /// internal.
 impl From<AppError> for ApiError {
@@ -273,6 +274,7 @@ impl From<AppError> for ApiError {
             | AppError::Forbidden
             | AppError::ReauthRequired => StatusCode::FORBIDDEN,
             AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::Stale => StatusCode::PRECONDITION_FAILED,
             AppError::Conflict { .. } => StatusCode::CONFLICT,
             AppError::InvalidToken | AppError::InvalidPasskey => StatusCode::BAD_REQUEST,
             AppError::ProviderUnavailable => StatusCode::BAD_GATEWAY,

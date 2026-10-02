@@ -12,6 +12,8 @@ error-forbidden = you do not have permission to do this
 error-reauth-required = confirm it's you to continue
 # Also the answer for things the person may not see, so it cannot be used to probe for them.
 error-not-found = not found
+# The client sent the version it read (`If-Match`) and the item changed since.
+error-stale = this was changed by someone else in the meantime, reload it and try again
 error-invalid-token = this link is invalid or has expired
 error-invalid-passkey = this passkey could not be verified
 error-provider-unavailable = the sign-in provider could not be reached, try again

@@ -25,7 +25,7 @@ use domain::{
     database::{Database, Transaction},
     id::NewId,
     pagination::{Page, PageRequest},
-    repository::{Repository, Resource},
+    repository::{Repository, Resource, Version, Versioned},
 };
 
 use crate::{
@@ -323,13 +323,8 @@ where
         I: Changes<E>,
         O: Present<E>,
     {
-        let current = self.authorize_in(store, actor, id, Action::Update).await?;
-        let changes = input.into_changes(actor, &current)?;
-
-        let updated = Repository::<E>::update(store, id, &changes)
-            .await?
-            .ok_or(AppError::NotFound)?;
-        Ok(O::present(updated, actor))
+        self.update_checked_in(store, actor, id, input, |_| Ok(()))
+            .await
     }
 
     pub async fn delete_in<S: Store + Repository<E>>(
@@ -338,11 +333,131 @@ where
         actor: &Actor,
         id: E::Id,
     ) -> Result<(), AppError> {
-        self.authorize_in(store, actor, id, Action::Delete).await?;
+        self.delete_checked_in(store, actor, id, |_| Ok(())).await
+    }
+
+    /// Authorizes, runs `check` on the locked entity, validates, then writes.
+    async fn update_checked_in<S, I, O>(
+        &self,
+        store: &mut S,
+        actor: &Actor,
+        id: E::Id,
+        input: I,
+        check: impl FnOnce(&E) -> Result<(), AppError> + Send,
+    ) -> Result<O, AppError>
+    where
+        S: Store + Repository<E>,
+        I: Changes<E>,
+        O: Present<E>,
+    {
+        let current = self.authorize_in(store, actor, id, Action::Update).await?;
+        check(&current)?;
+        let changes = input.into_changes(actor, &current)?;
+
+        let updated = Repository::<E>::update(store, id, &changes)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        Ok(O::present(updated, actor))
+    }
+
+    async fn delete_checked_in<S: Store + Repository<E>>(
+        &self,
+        store: &mut S,
+        actor: &Actor,
+        id: E::Id,
+        check: impl FnOnce(&E) -> Result<(), AppError> + Send,
+    ) -> Result<(), AppError> {
+        let current = self.authorize_in(store, actor, id, Action::Delete).await?;
+        check(&current)?;
         if Repository::<E>::delete(store, id).await? {
             Ok(())
         } else {
             Err(AppError::NotFound)
         }
+    }
+}
+
+/// Optimistic concurrency for a [`Versioned`] resource: `update` and `delete` that take the
+/// [`Version`] the client read and fail with `Stale` if the entity has moved on since. `None`
+/// skips the check, for clients that do not send one.
+///
+/// The check runs on the row locked by the transaction, after authorization, so it cannot be
+/// raced and an actor who may not touch the entity learns nothing from it.
+impl<A, E, P> CrudService<A, E, P>
+where
+    A: Adapters,
+    E: Resource + Versioned,
+    P: Policy<E>,
+    <A::Db as Database>::Connection: Repository<E>,
+    <A::Db as Database>::Transaction: Repository<E>,
+{
+    pub async fn update_if<I, O>(
+        &self,
+        actor: &Actor,
+        id: E::Id,
+        expected: Option<Version>,
+        input: I,
+    ) -> Result<O, AppError>
+    where
+        I: Changes<E>,
+        O: Present<E>,
+    {
+        let mut tx = self.ctx.db.transaction().await?;
+        let updated = self
+            .update_if_in(&mut tx, actor, id, expected, input)
+            .await?;
+        tx.commit().await?;
+        Ok(updated)
+    }
+
+    pub async fn delete_if(
+        &self,
+        actor: &Actor,
+        id: E::Id,
+        expected: Option<Version>,
+    ) -> Result<(), AppError> {
+        let mut tx = self.ctx.db.transaction().await?;
+        self.delete_if_in(&mut tx, actor, id, expected).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn update_if_in<S, I, O>(
+        &self,
+        store: &mut S,
+        actor: &Actor,
+        id: E::Id,
+        expected: Option<Version>,
+        input: I,
+    ) -> Result<O, AppError>
+    where
+        S: Store + Repository<E>,
+        I: Changes<E>,
+        O: Present<E>,
+    {
+        self.update_checked_in(store, actor, id, input, |current| {
+            ensure_version(current, expected)
+        })
+        .await
+    }
+
+    pub async fn delete_if_in<S: Store + Repository<E>>(
+        &self,
+        store: &mut S,
+        actor: &Actor,
+        id: E::Id,
+        expected: Option<Version>,
+    ) -> Result<(), AppError> {
+        self.delete_checked_in(store, actor, id, |current| {
+            ensure_version(current, expected)
+        })
+        .await
+    }
+}
+
+fn ensure_version<E: Versioned>(entity: &E, expected: Option<Version>) -> Result<(), AppError> {
+    match expected {
+        Some(version) if version != entity.version() => Err(AppError::Stale),
+        _ => Ok(()),
     }
 }

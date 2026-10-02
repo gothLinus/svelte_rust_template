@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            update notes\n            set title = coalesce($2, title), body = coalesce($3, body)\n            where id = $1\n            returning id, owner_id, title, body, created_at, updated_at\n            ",
+  "query": "\n            select id, owner_id, title, body, created_at, updated_at, version\n            from notes\n            where id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -68,13 +68,22 @@
             "name": "updated_at"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "notes",
+            "name": "version"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Text",
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -83,8 +92,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "fba6ddd6126c58285a9905b77008f3c8db083b4ac11c33a96e00ece9146f3e08"
+  "hash": "3a0a7b95ed9f9e6743a67f509993033ed499195f7bf48f336952610c83bcd314"
 }

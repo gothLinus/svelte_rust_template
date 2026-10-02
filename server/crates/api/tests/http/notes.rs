@@ -251,3 +251,65 @@ async fn only_large_responses_are_compressed(pool: PgPool) {
     assert_eq!(response.status, StatusCode::OK);
     assert_eq!(response.header("content-encoding"), Some("br"));
 }
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn versions_travel_as_etag_and_if_match(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let token = app.register("alice@example.com").await;
+    let note = create(&app, &token, "Draft").await;
+    assert_eq!(note.version, 1);
+    let uri = format!("/api/v1/notes/{}", note.id);
+
+    let fetched = app.send(TestRequest::get(&uri).session(&token)).await;
+    assert_eq!(fetched.header("etag"), Some("\"1\""));
+
+    let updated = app
+        .send(
+            TestRequest::patch(&uri)
+                .session(&token)
+                .header("if-match", "\"1\"")
+                .proto(&changes(Some("Final"), None)),
+        )
+        .await;
+    assert_eq!(updated.status, StatusCode::OK, "{}", updated.text);
+    assert_eq!(updated.header("etag"), Some("\"2\""));
+    assert_eq!(updated.decode::<v1::Note>().version, 2);
+
+    // Someone still holding version 1, or sending a tag this server never issues.
+    for tag in ["\"1\"", "W/\"2\"", "2", "\"2\", \"3\""] {
+        app.send(
+            TestRequest::patch(&uri)
+                .session(&token)
+                .header("if-match", tag)
+                .proto(&changes(Some("Lost"), None)),
+        )
+        .await
+        .assert_problem(StatusCode::PRECONDITION_FAILED, "stale");
+    }
+    app.send(
+        TestRequest::delete(&uri)
+            .session(&token)
+            .header("if-match", "\"1\""),
+    )
+    .await
+    .assert_problem(StatusCode::PRECONDITION_FAILED, "stale");
+
+    let unconditional = app
+        .send(
+            TestRequest::patch(&uri)
+                .session(&token)
+                .header("if-match", "*")
+                .proto(&changes(None, Some("any"))),
+        )
+        .await;
+    assert_eq!(unconditional.decode::<v1::Note>().title, "Final");
+
+    let deleted = app
+        .send(
+            TestRequest::delete(&uri)
+                .session(&token)
+                .header("if-match", "\"3\""),
+        )
+        .await;
+    assert_eq!(deleted.status, StatusCode::NO_CONTENT, "{}", deleted.text);
+}

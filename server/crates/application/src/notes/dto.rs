@@ -5,6 +5,7 @@
 use domain::{
     note::{NewNote, Note, NoteBody, NoteChanges, NoteFilter, NoteTitle},
     pagination::{NewestFirst, PageRequest},
+    repository::Versioned,
 };
 use serde::Deserialize;
 use time::OffsetDateTime;
@@ -25,6 +26,8 @@ pub struct NoteDto {
     pub body: String,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
+    /// Send back as `If-Match` to update or delete only this version.
+    pub version: i64,
 }
 
 impl From<Note> for NoteDto {
@@ -36,6 +39,7 @@ impl From<Note> for NoteDto {
             body: note.body().as_str().to_owned(),
             created_at: note.created_at(),
             updated_at: note.updated_at(),
+            version: note.version().get(),
         }
     }
 }

@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file api/v1/notes.proto.
  */
 export const file_api_v1_notes: GenFile = /*@__PURE__*/
-  fileDesc("ChJhcGkvdjEvbm90ZXMucHJvdG8SBmFwaS52MSKhAQoETm90ZRIKCgJpZBgBIAEoCRIQCghvd25lcl9pZBgCIAEoCRINCgV0aXRsZRgDIAEoCRIMCgRib2R5GAQgASgJEi4KCmNyZWF0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj4KEUNyZWF0ZU5vdGVSZXF1ZXN0Eg0KBXRpdGxlGAEgASgJEhEKBGJvZHkYAiABKAlIAIgBAUIHCgVfYm9keSJNChFVcGRhdGVOb3RlUmVxdWVzdBISCgV0aXRsZRgBIAEoCUgAiAEBEhEKBGJvZHkYAiABKAlIAYgBAUIICgZfdGl0bGVCBwoFX2JvZHkiUQoITm90ZVBhZ2USGwoFaXRlbXMYASADKAsyDC5hcGkudjEuTm90ZRIYCgtuZXh0X2N1cnNvchgCIAEoCUgAiAEBQg4KDF9uZXh0X2N1cnNvcmIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("ChJhcGkvdjEvbm90ZXMucHJvdG8SBmFwaS52MSK2AQoETm90ZRIKCgJpZBgBIAEoCRIQCghvd25lcl9pZBgCIAEoCRINCgV0aXRsZRgDIAEoCRIMCgRib2R5GAQgASgJEi4KCmNyZWF0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKB3ZlcnNpb24YByABKANCAjABIj4KEUNyZWF0ZU5vdGVSZXF1ZXN0Eg0KBXRpdGxlGAEgASgJEhEKBGJvZHkYAiABKAlIAIgBAUIHCgVfYm9keSJNChFVcGRhdGVOb3RlUmVxdWVzdBISCgV0aXRsZRgBIAEoCUgAiAEBEhEKBGJvZHkYAiABKAlIAYgBAUIICgZfdGl0bGVCBwoFX2JvZHkiUQoITm90ZVBhZ2USGwoFaXRlbXMYASADKAsyDC5hcGkudjEuTm90ZRIYCgtuZXh0X2N1cnNvchgCIAEoCUgAiAEBQg4KDF9uZXh0X2N1cnNvcmIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message api.v1.Note
@@ -50,6 +50,14 @@ export type Note = Message<"api.v1.Note"> & {
    * @generated from field: google.protobuf.Timestamp updated_at = 6;
    */
   updatedAt?: Timestamp | undefined;
+
+  /**
+   * Starts at 1 and grows with every update. Send it back as `If-Match: "<version>"` to
+   * update or delete only this version; a newer one answers `412`.
+   *
+   * @generated from field: int64 version = 7 [jstype = JS_STRING];
+   */
+  version: string;
 };
 
 /**

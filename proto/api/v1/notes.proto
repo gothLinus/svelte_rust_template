@@ -14,6 +14,9 @@ message Note {
   string body = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  // Starts at 1 and grows with every update. Send it back as `If-Match: "<version>"` to
+  // update or delete only this version; a newer one answers `412`.
+  int64 version = 7 [jstype = JS_STRING];
 }
 
 message CreateNoteRequest {

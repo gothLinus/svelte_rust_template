@@ -13,10 +13,12 @@ pub use auth::{
 };
 pub use client::{Client, client_ip};
 pub use language::Language;
+pub use precondition::{ETag, IfMatch};
 
 mod auth;
 mod client;
 mod language;
+mod precondition;
 
 #[derive(Debug, FromRequestParts)]
 #[from_request(via(axum::extract::Query), rejection(ApiError))]

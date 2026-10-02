@@ -128,6 +128,10 @@ pub enum AppError {
     /// cannot be probed.
     #[error("not found")]
     NotFound,
+    /// The entity changed since the version the client read (it sent that version as a
+    /// precondition); the client reloads it and decides again.
+    #[error("the resource was changed by someone else")]
+    Stale,
     #[error("conflict: {code}")]
     Conflict {
         code: &'static str,
@@ -178,6 +182,7 @@ impl AppError {
             Self::Forbidden => "forbidden",
             Self::ReauthRequired => "reauth_required",
             Self::NotFound => "not_found",
+            Self::Stale => "stale",
             Self::Conflict { code, .. } => code,
             Self::InvalidToken => "invalid_token",
             Self::InvalidPasskey => "invalid_passkey",
@@ -200,6 +205,7 @@ impl AppError {
             Self::Forbidden => Message::new("error-forbidden"),
             Self::ReauthRequired => Message::new("error-reauth-required"),
             Self::NotFound => Message::new("error-not-found"),
+            Self::Stale => Message::new("error-stale"),
             Self::Conflict { message, .. } => message.clone(),
             Self::InvalidToken => Message::new("error-invalid-token"),
             Self::InvalidPasskey => Message::new("error-invalid-passkey"),

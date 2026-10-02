@@ -6,6 +6,7 @@ use application::{
 use domain::{
     note::NoteId,
     rbac::{Permission, PermissionSet},
+    repository::Version,
 };
 
 use crate::support::Fixture;
@@ -52,6 +53,7 @@ async fn owners_can_do_everything_with_their_notes() {
         .update(
             &alice.actor,
             id(&created),
+            None,
             UpdateNoteRequest {
                 title: None,
                 body: Some("milk, eggs".to_owned()),
@@ -64,7 +66,7 @@ async fn owners_can_do_everything_with_their_notes() {
 
     fx.services
         .notes
-        .delete(&alice.actor, id(&created))
+        .delete(&alice.actor, id(&created), None)
         .await
         .unwrap();
     let err = fx
@@ -90,13 +92,18 @@ async fn other_users_notes_are_invisible() {
         .update(
             &bob.actor,
             id(&secret),
+            None,
             UpdateNoteRequest {
                 title: Some("pwned".to_owned()),
                 body: None,
             },
         )
         .await;
-    let delete = fx.services.notes.delete(&bob.actor, id(&secret)).await;
+    let delete = fx
+        .services
+        .notes
+        .delete(&bob.actor, id(&secret), None)
+        .await;
 
     // 404, not 403: bob cannot even learn that the note exists.
     for result in [get.map(drop), update.map(drop), delete] {
@@ -124,6 +131,7 @@ async fn managers_can_change_anyones_notes() {
         .update(
             &admin.actor,
             id(&alices),
+            None,
             UpdateNoteRequest {
                 title: Some("Moderated".to_owned()),
                 body: None,
@@ -136,7 +144,7 @@ async fn managers_can_change_anyones_notes() {
 
     fx.services
         .notes
-        .delete(&admin.actor, id(&alices))
+        .delete(&admin.actor, id(&alices), None)
         .await
         .unwrap();
 }
@@ -240,6 +248,7 @@ async fn invalid_input_is_reported_per_field() {
         .update(
             &alice.actor,
             id(&created),
+            None,
             UpdateNoteRequest {
                 title: Some("  ".to_owned()),
                 body: None,
@@ -292,6 +301,7 @@ async fn permissions_are_checked_before_input() {
         .update(
             &read_only,
             id(&existing),
+            None,
             UpdateNoteRequest {
                 title: Some("changed".to_owned()),
                 body: None,
@@ -303,7 +313,7 @@ async fn permissions_are_checked_before_input() {
     let err = fx
         .services
         .notes
-        .delete(&read_only, id(&existing))
+        .delete(&read_only, id(&existing), None)
         .await
         .unwrap_err();
     assert_eq!(err.code(), "forbidden");
@@ -315,4 +325,82 @@ async fn permissions_are_checked_before_input() {
         .await
         .unwrap_err();
     assert_eq!(err.code(), "forbidden");
+}
+
+fn retitle(title: &str) -> UpdateNoteRequest {
+    UpdateNoteRequest {
+        title: Some(title.to_owned()),
+        body: None,
+    }
+}
+
+#[tokio::test]
+async fn every_update_bumps_the_version_and_an_outdated_one_is_refused() {
+    let fx = Fixture::new();
+    let alice = fx.user("alice@example.com").await;
+    let created = note(&fx, &alice.actor, "Draft").await;
+    assert_eq!(created.version, 1);
+    let read = Some(Version::new(created.version));
+
+    let first = fx
+        .services
+        .notes
+        .update(&alice.actor, id(&created), read, retitle("Mine"))
+        .await
+        .unwrap();
+    assert_eq!(first.version, 2);
+
+    // A second editor still holding version 1 does not overwrite the first one's change.
+    let err = fx
+        .services
+        .notes
+        .update(&alice.actor, id(&created), read, retitle("Theirs"))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, AppError::Stale), "{err:?}");
+    let err = fx
+        .services
+        .notes
+        .delete(&alice.actor, id(&created), read)
+        .await
+        .unwrap_err();
+    assert!(matches!(err, AppError::Stale), "{err:?}");
+    let kept = fx
+        .services
+        .notes
+        .get(&alice.actor, id(&created))
+        .await
+        .unwrap();
+    assert_eq!(kept.title, "Mine");
+
+    fx.services
+        .notes
+        .delete(
+            &alice.actor,
+            id(&created),
+            Some(Version::new(first.version)),
+        )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn a_stale_version_does_not_reveal_a_note_the_actor_cannot_see() {
+    let fx = Fixture::new();
+    let alice = fx.user("alice@example.com").await;
+    let bob = fx.user("bob@example.com").await;
+    let secret = note(&fx, &alice.actor, "Secret").await;
+
+    let err = fx
+        .services
+        .notes
+        .update(
+            &bob.actor,
+            id(&secret),
+            Some(Version::new(99)),
+            retitle("x"),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "not_found");
 }

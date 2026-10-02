@@ -27,6 +27,7 @@ export const TIMEOUT_ERROR = 'timeout';
 export const ABORTED = 'aborted';
 export const INVALID_RESPONSE = 'invalid_response';
 export const REAUTH_REQUIRED = 'reauth_required';
+export const STALE = 'stale';
 
 /**
  * Messages for codes where the server's own wording does not say what to do next; `undefined`

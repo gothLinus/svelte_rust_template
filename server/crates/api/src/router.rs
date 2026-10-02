@@ -173,8 +173,9 @@ fn cors_layer(config: &HttpConfig) -> Option<CorsLayer> {
                 Method::PATCH,
                 Method::DELETE,
             ])
-            .allow_headers([header::CONTENT_TYPE, X_REQUESTED_WITH])
+            .allow_headers([header::CONTENT_TYPE, header::IF_MATCH, X_REQUESTED_WITH])
             .expose_headers([
+                header::ETAG,
                 header::RETRY_AFTER,
                 header::LOCATION,
                 HeaderName::from_static("x-request-id"),

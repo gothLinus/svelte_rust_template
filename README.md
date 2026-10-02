@@ -25,6 +25,8 @@ locales/   Fluent translations for the server and the web app
 - An audit log of security events (sign-ins, failed attempts, changed sign-in methods, role
   changes): users see their own on the security page, holders of `audit:read` see everyone's.
 - Problem Details errors (RFC 9457) with field-level validation, keyset pagination.
+- Optimistic concurrency: every note carries a version, sent as `ETag`; updates and deletes
+  with `If-Match` are refused with `412` if someone changed it since.
 - Translations in Fluent files, English and German included, with a language switcher.
   Each account keeps its language, and mail and texts to it follow that language.
 - `just new-resource` scaffolds a new resource in every layer, copied from the `notes` example.
@@ -137,6 +139,10 @@ from the same origin; in development Vite proxies `/api`.
 
 - Lists use `?limit=20&after=<cursor>` and return `items` and `next_cursor`, newest first,
   at most 100 per page.
+- Versioned resources (notes, and anything copied from them) return their `version` in the
+  body and as a strong `ETag` (`"3"`). Send it back as `If-Match` on `PATCH` and `DELETE`; a
+  newer version answers `412` with code `stale`. Without `If-Match` the change applies to
+  whatever is there.
 
 ## Translations
 

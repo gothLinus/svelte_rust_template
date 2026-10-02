@@ -8,6 +8,7 @@ http-status-403 = Forbidden
 http-status-404 = Not Found
 http-status-405 = Method Not Allowed
 http-status-409 = Conflict
+http-status-412 = Precondition Failed
 http-status-413 = Payload Too Large
 http-status-415 = Unsupported Media Type
 http-status-422 = Unprocessable Entity

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                    select id, owner_id, title, body, created_at, updated_at\n                    from notes\n                    where owner_id = $1 and id < $2\n                    order by id desc\n                    limit $3\n                    ",
+  "query": "\n                    select id, owner_id, title, body, created_at, updated_at, version\n                    from notes\n                    where id < $1\n                    order by id desc\n                    limit $2\n                    ",
   "describe": {
     "columns": [
       {
@@ -68,11 +68,21 @@
             "name": "updated_at"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "notes",
+            "name": "version"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Uuid",
         "Int8"
       ]
@@ -83,8 +93,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "a53f2cd1640f407322617140af27d471953515001b5f72f3bd6264b36c2f65eb"
+  "hash": "196308a85dccdbcd4995d32dfa2bd5e16a60bd93fac9cbae265710d41a733d9f"
 }

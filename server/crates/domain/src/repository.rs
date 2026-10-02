@@ -41,6 +41,35 @@ pub trait Resource: Sized + Send + Sync + 'static {
     type Sort: Sort;
 }
 
+/// How many times an entity has been written: [`Version::FIRST`] when created, one more with every
+/// update. A client that read version `n` can ask for its change to apply only while the entity is
+/// still at `n`, so two people editing it at once cannot silently overwrite each other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Version(i64);
+
+impl Version {
+    pub const FIRST: Self = Self(1);
+
+    pub const fn new(raw: i64) -> Self {
+        Self(raw)
+    }
+
+    pub const fn get(self) -> i64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+/// A [`Resource`] that carries a [`Version`], so `application::crud::CrudService` can refuse an
+/// update or delete made against an older one. The repository bumps it on every `update`.
+pub trait Versioned {
+    fn version(&self) -> Version;
+}
+
 /// Basic persistence for a [`Resource`]. Entity-specific queries go into their own traits
 /// next to the entity, implemented on the same connection type.
 ///

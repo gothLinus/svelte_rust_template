@@ -151,10 +151,22 @@ const now = BigInt(
 );
 const stamp = (now > latest ? now : latest + 1n).toString();
 const migration = `server/migrations/${stamp}_create_${plural}`;
-const table = rename(read('server/migrations/20260925000006_notes.up.sql')).replace(
+const copiedTable = rename(read('server/migrations/20260925000006_notes.up.sql')).replace(
 	/^-- The example resource\. Copy this migration when adding one\.\n/,
 	`-- ${names.Notes}, copied from the notes: rename the columns to its fields.\n`
 );
+// The notes got their version later (`*_note_versions.up.sql`); a new table has it from the start.
+const lastColumn = /(\n {4}updated_at timestamptz not null default now\(\))\n\);/;
+if (!lastColumn.test(copiedTable)) {
+	fail('the notes migration no longer ends its columns with updated_at: add the version column by hand');
+}
+const table = `${copiedTable.replace(
+	lastColumn,
+	'$1,\n    version bigint not null default 1 check (version >= 1)\n);'
+)}
+create trigger ${plural}_bump_version before update on ${plural}
+    for each row execute function bump_version();
+`;
 write(
 	`${migration}.up.sql`,
 	`${table}

@@ -12,6 +12,7 @@ error-forbidden = Sie haben keine Berechtigung für diese Aktion
 error-reauth-required = bestätigen Sie, dass Sie es sind, um fortzufahren
 # Auch die Antwort für Dinge, die die Person nicht sehen darf, damit sich damit nicht nach ihnen suchen lässt.
 error-not-found = nicht gefunden
+error-stale = dies wurde zwischenzeitlich von jemand anderem geändert, laden Sie es neu und versuchen Sie es noch einmal
 error-invalid-token = dieser Link ist ungültig oder abgelaufen
 error-invalid-passkey = dieser Passkey konnte nicht überprüft werden
 error-provider-unavailable = der Anmeldeanbieter ist nicht erreichbar, versuchen Sie es erneut

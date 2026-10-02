@@ -35,6 +35,7 @@ impl IntoMessage for NoteDto {
             body: self.body,
             created_at: Some(timestamp(self.created_at)),
             updated_at: Some(timestamp(self.updated_at)),
+            version: self.version,
         }
     }
 }

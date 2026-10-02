@@ -8,6 +8,7 @@ http-status-403 = Zugriff verweigert
 http-status-404 = Nicht gefunden
 http-status-405 = Methode nicht erlaubt
 http-status-409 = Konflikt
+http-status-412 = Vorbedingung fehlgeschlagen
 http-status-413 = Anfrage zu groß
 http-status-415 = Nicht unterstützter Medientyp
 http-status-422 = Nicht verarbeitbare Anfrage

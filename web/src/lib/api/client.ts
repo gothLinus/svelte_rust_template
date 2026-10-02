@@ -48,6 +48,8 @@ export function encode<Desc extends DescMessage>(
 export interface RequestOptions<T = void> {
 	query?: Query;
 	body?: Uint8Array<ArrayBuffer>;
+	/** Extra request headers, such as `if-match` (see `ifMatch`). */
+	headers?: Record<string, string>;
 	response?: Decoder<T>;
 	/**
 	 * The content type a successful response must have (default `PROTOBUF`), for the few
@@ -177,9 +179,11 @@ export class ApiClient {
 			handleUnauthenticated = true,
 			signal,
 			timeoutMs,
-			accept = PROTOBUF
+			accept = PROTOBUF,
+			headers: extraHeaders
 		} = options;
 		const headers: Record<string, string> = {
+			...extraHeaders,
 			accept: `${accept}, application/problem+json`,
 			'x-requested-with': 'fetch',
 			'accept-language': i18n.locale
@@ -265,6 +269,14 @@ export function searchParams(query: Query | undefined): string {
 	}
 	const search = params.toString();
 	return search ? `?${search}` : '';
+}
+
+/**
+ * Makes an update or delete apply only to the `version` the client read: the server answers
+ * `412` with code `stale` (`STALE`) if the item changed since.
+ */
+export function ifMatch(version: string): Record<string, string> {
+	return { 'if-match': `"${version}"` };
 }
 
 export function segment(id: string): string {

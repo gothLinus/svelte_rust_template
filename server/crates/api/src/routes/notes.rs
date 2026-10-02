@@ -12,6 +12,9 @@
 //!   wrapped in the domain id type.
 //! - Status codes: `200` for reads and updates, `201` with a `Location` for creation, `204` for
 //!   deletion.
+//! - Optimistic concurrency: responses with one note carry its version as [`ETag`]; update and
+//!   delete take [`IfMatch`] and answer `412` if the note changed since (see
+//!   `domain::repository::Version`).
 //!
 //! The per-IP API rate limit, CSRF check and session lookup apply to the whole `/api/v1` group
 //! (see `crate::router`); an endpoint that needs a tighter limit calls `state.limits`, as
@@ -33,11 +36,11 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use domain::note::NoteId;
+use domain::{note::NoteId, repository::Version};
 use uuid::Uuid;
 
 use crate::{
-    extract::{CurrentUser, Path, Proto, Query},
+    extract::{CurrentUser, ETag, IfMatch, Path, Proto, Query},
     problem::ApiError,
     state::AppState,
 };
@@ -64,14 +67,13 @@ async fn show<A: Adapters>(
     State(state): State<AppState<A>>,
     user: CurrentUser,
     Path(id): Path<Uuid>,
-) -> Result<Proto<NoteDto>, ApiError> {
-    Ok(Proto(
-        state
-            .services
-            .notes
-            .get(user.actor(), NoteId::from_uuid(id))
-            .await?,
-    ))
+) -> Result<(ETag, Proto<NoteDto>), ApiError> {
+    let note = state
+        .services
+        .notes
+        .get(user.actor(), NoteId::from_uuid(id))
+        .await?;
+    Ok(tagged(note))
 }
 
 async fn create<A: Adapters>(
@@ -99,33 +101,38 @@ async fn duplicate<A: Adapters>(
 fn created(note: NoteDto) -> Result<Response, ApiError> {
     let location = HeaderValue::from_str(&format!("/api/v1/notes/{}", note.id))
         .map_err(|err| ApiError::internal(&err))?;
-    Ok((StatusCode::CREATED, [(LOCATION, location)], Proto(note)).into_response())
+    Ok((StatusCode::CREATED, [(LOCATION, location)], tagged(note)).into_response())
+}
+
+fn tagged(note: NoteDto) -> (ETag, Proto<NoteDto>) {
+    (ETag(Version::new(note.version)), Proto(note))
 }
 
 async fn update<A: Adapters>(
     State(state): State<AppState<A>>,
     user: CurrentUser,
     Path(id): Path<Uuid>,
+    IfMatch(expected): IfMatch,
     Proto(body): Proto<UpdateNoteRequest>,
-) -> Result<Proto<NoteDto>, ApiError> {
-    Ok(Proto(
-        state
-            .services
-            .notes
-            .update(user.actor(), NoteId::from_uuid(id), body)
-            .await?,
-    ))
+) -> Result<(ETag, Proto<NoteDto>), ApiError> {
+    let note = state
+        .services
+        .notes
+        .update(user.actor(), NoteId::from_uuid(id), expected, body)
+        .await?;
+    Ok(tagged(note))
 }
 
 async fn destroy<A: Adapters>(
     State(state): State<AppState<A>>,
     user: CurrentUser,
     Path(id): Path<Uuid>,
+    IfMatch(expected): IfMatch,
 ) -> Result<StatusCode, ApiError> {
     state
         .services
         .notes
-        .delete(user.actor(), NoteId::from_uuid(id))
+        .delete(user.actor(), NoteId::from_uuid(id), expected)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
