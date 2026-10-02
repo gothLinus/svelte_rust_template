@@ -20,7 +20,8 @@ locales/   Fluent translations for the server and the web app
 - Two-step verification: authenticator apps, security keys, recovery codes.
 - Email verification, password reset, session list with revocation.
 - Account deletion and a JSON export of the user's data.
-- Roles and permissions with ownership rules.
+- Roles and permissions with ownership rules. Admins change roles, disable accounts, see
+  a user's sessions and sign them out of one device or everywhere.
 - An audit log of security events (sign-ins, failed attempts, changed sign-in methods, role
   changes): users see their own on the security page, holders of `audit:read` see everyone's.
 - Problem Details errors (RFC 9457) with field-level validation, keyset pagination.

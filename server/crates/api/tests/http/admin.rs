@@ -20,6 +20,12 @@ async fn admin_endpoints_are_401_anonymous_and_403_without_permission(pool: PgPo
             TestRequest::delete(&format!("/api/v1/admin/users/{id}/roles/user")),
             TestRequest::post(&format!("/api/v1/admin/users/{id}/disable")),
             TestRequest::post(&format!("/api/v1/admin/users/{id}/enable")),
+            TestRequest::get(&format!("/api/v1/admin/users/{id}/sessions")),
+            TestRequest::delete(&format!("/api/v1/admin/users/{id}/sessions")),
+            TestRequest::delete(&format!(
+                "/api/v1/admin/users/{id}/sessions/{}",
+                uuid::Uuid::nil()
+            )),
         ]
     };
     for request in requests() {
@@ -195,4 +201,58 @@ async fn unknown_users_are_404(pool: PgPool) {
     app.send(TestRequest::put(&format!("/api/v1/admin/users/{id}/roles/admin")).session(&admin))
         .await
         .assert_problem(StatusCode::NOT_FOUND, "not_found");
+}
+
+#[sqlx::test(migrator = "infrastructure::db::MIGRATOR")]
+async fn admins_list_and_end_a_users_sessions(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let admin = app.admin("admin@example.com").await;
+    let alice = app.register("alice@example.com").await;
+    let second = app
+        .login("alice@example.com", PASSWORD)
+        .await
+        .session_token()
+        .unwrap();
+    let id = app.user_id(&alice).await;
+    let sessions_uri = format!("/api/v1/admin/users/{id}/sessions");
+
+    let listed = app
+        .send(TestRequest::get(&sessions_uri).session(&admin))
+        .await;
+    assert_eq!(listed.status, StatusCode::OK, "{}", listed.text);
+    let sessions = listed.decode::<v1::SessionList>().sessions;
+    assert_eq!(sessions.len(), 2);
+    assert!(sessions.iter().all(|session| !session.current));
+
+    let revoked = app
+        .send(TestRequest::delete(&format!("{sessions_uri}/{}", sessions[0].id)).session(&admin))
+        .await;
+    assert_eq!(revoked.status, StatusCode::NO_CONTENT, "{}", revoked.text);
+    let remaining = app
+        .send(TestRequest::get(&sessions_uri).session(&admin))
+        .await
+        .decode::<v1::SessionList>()
+        .sessions;
+    assert_eq!(remaining.len(), 1);
+
+    let signed_out = app
+        .send(TestRequest::delete(&sessions_uri).session(&admin))
+        .await;
+    assert_eq!(
+        signed_out.status,
+        StatusCode::NO_CONTENT,
+        "{}",
+        signed_out.text
+    );
+    for token in [&alice, &second] {
+        let me = app
+            .send(TestRequest::get("/api/v1/me").session(token))
+            .await;
+        assert_eq!(me.status, StatusCode::UNAUTHORIZED);
+    }
+    // Signed out, not disabled.
+    assert_eq!(
+        app.login("alice@example.com", PASSWORD).await.status,
+        StatusCode::OK
+    );
 }

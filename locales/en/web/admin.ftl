@@ -13,6 +13,8 @@ admin-manage-label = Manage { $name }
 admin-menu-roles = Roles
 # Opens the audit log filtered to that user.
 admin-view-activity = View activity
+admin-view-sessions = View sessions
+admin-sign-out = Sign out everywhere
 admin-enable = Enable account
 admin-disable = Disable account
 # Screen-reader name of the previous/next navigation below the list.
@@ -23,14 +25,27 @@ admin-disable-title = Disable { $name }?
 admin-disable-description = They are signed out on every device and cannot sign in until an admin enables the account again.
 admin-disable-confirm = Disable account
 
+# $name is the username.
+admin-sign-out-title = Sign { $name } out everywhere?
+admin-sign-out-description = Every session ends and pending sign-in links stop working. The account stays enabled, so they can sign in again.
+admin-sign-out-confirm = Sign out everywhere
+
+# The dialog listing someone's signed-in devices. $name is the username.
+admin-sessions-title = Sessions of { $name }
+admin-sessions-description = Browsers and devices signed in to this account right now.
+admin-sessions-empty = Not signed in anywhere.
+
 # Notices. $name is the username, $role the role's name.
 admin-role-revoked = { $name } no longer has the { $role } role.
 admin-role-granted = { $name } now has the { $role } role.
 admin-enabled = { $name } can sign in again.
 admin-disabled = { $name } was disabled and signed out everywhere.
+admin-signed-out = { $name } was signed out everywhere.
+# $device describes the browser and system, such as "Firefox on macOS".
+admin-session-signed-out = { $name } was signed out on { $device }.
 
 # $permission is the permission's technical name and stays untranslated; it is shown as code.
-admin-view-only = You can view accounts. Changing roles or disabling accounts needs the { $permission } permission.
+admin-view-only = You can view accounts. Changing roles, signing users out or disabling accounts needs the { $permission } permission.
 
 ## Audit log
 

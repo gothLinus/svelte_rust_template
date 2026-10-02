@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	import { api, errorMessage } from '$lib/api';
 	import { hasPermission, tabSync } from '$lib/auth';
+	import UserSessionsDialog from '$lib/components/admin/user-sessions-dialog.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import CursorPagination from '$lib/components/cursor-pagination.svelte';
 	import PageHeading from '$lib/components/page-heading.svelte';
@@ -93,6 +94,21 @@
 			() => api.admin.disable(user.id),
 			(u) => t('admin-disabled', { name: u.username })
 		);
+
+	let sessionsOf = $state<User | null>(null);
+	let sessionsOpen = $state(false);
+
+	let signingOut = $state<User | null>(null);
+	let signOutOpen = $state(false);
+
+	const signOut = (user: User) =>
+		change(
+			async () => {
+				await api.admin.signOut(user.id);
+				return user;
+			},
+			(u) => t('admin-signed-out', { name: u.username })
+		);
 </script>
 
 <PageHeading title={t('admin-users-title')} description={t('admin-users-description')} />
@@ -141,62 +157,66 @@
 					<span class="hidden w-28 shrink-0 text-sm text-muted-foreground md:block">
 						{formatDate(user.createdAt)}
 					</span>
-					{#if canManage || canAudit}
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger
-								class={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
-								aria-label={t('admin-manage-label', { name: user.username })}
-								disabled={busy}
-							>
-								<EllipsisIcon />
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content align="end" class="w-56">
-								{#if canAudit}
-									<DropdownMenu.Item onSelect={() => viewActivity(user)}>
-										{t('admin-view-activity')}
-									</DropdownMenu.Item>
-								{/if}
-								{#if canAudit && canManage}<DropdownMenu.Separator />{/if}
-								{#if canManage}
-									<DropdownMenu.Label>{t('admin-menu-roles')}</DropdownMenu.Label>
-									{#each data.roles as role (role.name)}
-										{@const described = role.description
-											? `role-${role.name}-description`
-											: undefined}
-										<DropdownMenu.CheckboxItem
-											checked={user.roles.includes(role.name)}
-											onCheckedChange={() => toggleRole(user, role.name)}
-											aria-describedby={described}
-										>
-											<span class="flex min-w-0 flex-col">
-												<span class="capitalize">{role.name}</span>
-												{#if described}
-													<!-- A description, not part of the item's name. -->
-													<span
-														id={described}
-														aria-hidden="true"
-														class="text-xs font-normal whitespace-normal text-muted-foreground"
-													>
-														{role.description}
-													</span>
-												{/if}
-											</span>
-										</DropdownMenu.CheckboxItem>
-									{/each}
-								{/if}
-								{#if canManage && !self}
-									<DropdownMenu.Separator />
-									<DropdownMenu.Item
-										variant={user.disabled ? 'default' : 'destructive'}
-										onSelect={() =>
-											user.disabled ? enable(user) : ((disabling = user), (disableOpen = true))}
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							class={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
+							aria-label={t('admin-manage-label', { name: user.username })}
+							disabled={busy}
+						>
+							<EllipsisIcon />
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-56">
+							<DropdownMenu.Item onSelect={() => ((sessionsOf = user), (sessionsOpen = true))}>
+								{t('admin-view-sessions')}
+							</DropdownMenu.Item>
+							{#if canAudit}
+								<DropdownMenu.Item onSelect={() => viewActivity(user)}>
+									{t('admin-view-activity')}
+								</DropdownMenu.Item>
+							{/if}
+							{#if canManage}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Label>{t('admin-menu-roles')}</DropdownMenu.Label>
+								{#each data.roles as role (role.name)}
+									{@const described = role.description
+										? `role-${role.name}-description`
+										: undefined}
+									<DropdownMenu.CheckboxItem
+										checked={user.roles.includes(role.name)}
+										onCheckedChange={() => toggleRole(user, role.name)}
+										aria-describedby={described}
 									>
-										{user.disabled ? t('admin-enable') : t('admin-disable')}
-									</DropdownMenu.Item>
-								{/if}
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
-					{/if}
+										<span class="flex min-w-0 flex-col">
+											<span class="capitalize">{role.name}</span>
+											{#if described}
+												<!-- A description, not part of the item's name. -->
+												<span
+													id={described}
+													aria-hidden="true"
+													class="text-xs font-normal whitespace-normal text-muted-foreground"
+												>
+													{role.description}
+												</span>
+											{/if}
+										</span>
+									</DropdownMenu.CheckboxItem>
+								{/each}
+							{/if}
+							{#if canManage && !self}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item onSelect={() => ((signingOut = user), (signOutOpen = true))}>
+									{t('admin-sign-out')}
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									variant={user.disabled ? 'default' : 'destructive'}
+									onSelect={() =>
+										user.disabled ? enable(user) : ((disabling = user), (disableOpen = true))}
+								>
+									{user.disabled ? t('admin-enable') : t('admin-disable')}
+								</DropdownMenu.Item>
+							{/if}
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 				</li>
 			{/each}
 		</ul>
@@ -223,6 +243,18 @@
 		if (disabling) await disable(disabling);
 	}}
 />
+
+<ConfirmDialog
+	bind:open={signOutOpen}
+	title={t('admin-sign-out-title', { name: signingOut?.username ?? '' })}
+	description={t('admin-sign-out-description')}
+	confirmLabel={t('admin-sign-out-confirm')}
+	onconfirm={async () => {
+		if (signingOut) await signOut(signingOut);
+	}}
+/>
+
+<UserSessionsDialog bind:open={sessionsOpen} user={sessionsOf} {canManage} />
 
 {#if !canManage}
 	<p class="text-sm text-muted-foreground">

@@ -7,15 +7,16 @@ use application::{
     Adapters,
     admin::dto::ListUsersQuery,
     audit::dto::{AuditEventDto, ListAuditQuery},
-    dto::{RoleDto, UserDto},
+    dto::{RoleDto, SessionDto, UserDto},
     pagination::PageDto,
 };
 use axum::{
     Router,
     extract::State,
-    routing::{get, post, put},
+    http::StatusCode,
+    routing::{delete, get, post, put},
 };
-use domain::user::UserId;
+use domain::{session::SessionId, user::UserId};
 use uuid::Uuid;
 
 use crate::{
@@ -34,6 +35,14 @@ pub fn routes<A: Adapters>() -> Router<AppState<A>> {
         )
         .route("/admin/users/{id}/disable", post(disable::<A>))
         .route("/admin/users/{id}/enable", post(enable::<A>))
+        .route(
+            "/admin/users/{id}/sessions",
+            get(user_sessions::<A>).delete(sign_out_user::<A>),
+        )
+        .route(
+            "/admin/users/{id}/sessions/{session}",
+            delete(revoke_user_session::<A>),
+        )
         .route("/admin/roles", get(list_roles::<A>))
         .route("/admin/audit", get(list_audit_events::<A>))
 }
@@ -153,4 +162,48 @@ async fn enable<A: Adapters>(
             )
             .await?,
     ))
+}
+
+async fn user_sessions<A: Adapters>(
+    State(state): State<AppState<A>>,
+    admin: RequirePermission<permission::UsersRead>,
+    Path(id): Path<Uuid>,
+) -> Result<Proto<Vec<SessionDto>>, ApiError> {
+    Ok(Proto(
+        state
+            .services
+            .admin
+            .user_sessions(admin.actor(), UserId::from_uuid(id))
+            .await?,
+    ))
+}
+
+async fn revoke_user_session<A: Adapters>(
+    State(state): State<AppState<A>>,
+    admin: RequirePermission<permission::UsersManage>,
+    Path((id, session)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .services
+        .admin
+        .revoke_user_session(
+            admin.actor(),
+            UserId::from_uuid(id),
+            SessionId::from_uuid(session),
+        )
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn sign_out_user<A: Adapters>(
+    State(state): State<AppState<A>>,
+    admin: RequirePermission<permission::UsersManage>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .services
+        .admin
+        .sign_out_user(admin.actor(), UserId::from_uuid(id))
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }

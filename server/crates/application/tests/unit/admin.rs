@@ -1,5 +1,9 @@
 use application::admin::dto::ListUsersQuery;
-use domain::{session::ClientInfo, user::UserId};
+use domain::{
+    audit::AuditAction,
+    session::{ClientInfo, SessionId},
+    user::UserId,
+};
 
 use crate::support::Fixture;
 
@@ -373,6 +377,11 @@ async fn admin_changes_need_a_recent_sign_in() {
             .set_status(&stale, target, application::admin::AccountStatus::Disabled)
             .await
             .map(|_| ()),
+        fx.services.admin.sign_out_user(&stale, target).await,
+        fx.services
+            .admin
+            .revoke_user_session(&stale, target, alice.actor.session_id)
+            .await,
     ];
     for result in results {
         assert_eq!(result.unwrap_err().code(), "reauth_required");
@@ -435,6 +444,14 @@ async fn managers_only_hand_out_and_act_on_what_they_hold() {
             )
             .await
             .map(|_| ()),
+        fx.services
+            .admin
+            .sign_out_user(&moderator, admin.actor.user_id)
+            .await,
+        fx.services
+            .admin
+            .revoke_user_session(&moderator, admin.actor.user_id, admin.actor.session_id)
+            .await,
     ];
     for result in forbidden {
         assert_eq!(result.unwrap_err().code(), "forbidden");
@@ -456,4 +473,125 @@ async fn managers_only_hand_out_and_act_on_what_they_hold() {
         )
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn admins_see_a_users_sessions_and_end_one() {
+    let fx = Fixture::new();
+    let admin = fx.admin("admin@example.com").await;
+    let alice = fx.register("alice@example.com").await;
+    let id = UserId::from_uuid(alice.me.user.id);
+
+    let sessions = fx
+        .services
+        .admin
+        .user_sessions(&admin.actor, id)
+        .await
+        .unwrap();
+    assert_eq!(sessions.len(), 1);
+    assert!(!sessions[0].current);
+    let session = SessionId::from_uuid(sessions[0].id);
+
+    fx.services
+        .admin
+        .revoke_user_session(&admin.actor, id, session)
+        .await
+        .unwrap();
+    assert!(
+        fx.services
+            .auth
+            .authenticate(&alice.token, ClientInfo::default())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        fx.services
+            .admin
+            .user_sessions(&admin.actor, id)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let err = fx
+        .services
+        .admin
+        .revoke_user_session(&admin.actor, id, session)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "not_found");
+
+    let recorded = fx.db.with(|state| {
+        state.audit_events.iter().any(|event| {
+            event.user_id == id
+                && event.action == AuditAction::SessionRevoked
+                && event.actor_id == Some(admin.actor.user_id)
+        })
+    });
+    assert!(recorded);
+}
+
+#[tokio::test]
+async fn signing_a_user_out_keeps_the_account_enabled() {
+    let fx = Fixture::new();
+    let admin = fx.admin("admin@example.com").await;
+    let alice = fx.register("alice@example.com").await;
+    let id = UserId::from_uuid(alice.me.user.id);
+
+    fx.services
+        .admin
+        .sign_out_user(&admin.actor, id)
+        .await
+        .unwrap();
+
+    assert!(
+        fx.services
+            .auth
+            .authenticate(&alice.token, ClientInfo::default())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let user = fx.services.admin.get_user(&admin.actor, id).await.unwrap();
+    assert!(!user.disabled);
+    let recorded = fx.db.with(|state| {
+        state.audit_events.iter().any(|event| {
+            event.user_id == id
+                && event.action == AuditAction::SignedOutEverywhere
+                && event.actor_id == Some(admin.actor.user_id)
+        })
+    });
+    assert!(recorded);
+
+    let err = fx
+        .services
+        .admin
+        .sign_out_user(&admin.actor, UserId::generate())
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "not_found");
+}
+
+#[tokio::test]
+async fn sessions_of_others_need_users_read_to_see_and_users_manage_to_end() {
+    let fx = Fixture::new();
+    let alice = fx.user("alice@example.com").await;
+    let bob = fx.user("bob@example.com").await;
+    let target = bob.actor.user_id;
+
+    let results = [
+        fx.services
+            .admin
+            .user_sessions(&alice.actor, target)
+            .await
+            .map(drop),
+        fx.services.admin.sign_out_user(&alice.actor, target).await,
+        fx.services
+            .admin
+            .revoke_user_session(&alice.actor, target, bob.actor.session_id)
+            .await,
+    ];
+    for result in results {
+        assert_eq!(result.unwrap_err().code(), "forbidden");
+    }
 }

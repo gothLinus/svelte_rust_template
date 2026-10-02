@@ -13,6 +13,7 @@ import {
 	RoleSchema,
 	TextChannel,
 	type User,
+	SessionListSchema,
 	UserPageSchema,
 	UserSchema,
 	VerifyPhoneCodeRequestSchema
@@ -224,6 +225,57 @@ describe('admin users', () => {
 		await vi.waitFor(() =>
 			expect(callOf(fetchFn)[0]).toBe(`/api/v1/admin/users/${OTHER_ID}/disable`)
 		);
+	});
+
+	it('signs a user out everywhere after asking', async () => {
+		const fetchFn = mockFetch(noContent());
+		vi.stubGlobal('fetch', fetchFn);
+		renderUsers();
+
+		await openMenu(t('admin-manage-label', { name: 'bob' }));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: t('admin-sign-out') }));
+		const dialog = await screen.findByRole('alertdialog', {
+			name: t('admin-sign-out-title', { name: 'bob' })
+		});
+		expect(fetchFn).not.toHaveBeenCalled();
+
+		await fireEvent.click(
+			within(dialog).getByRole('button', { name: t('admin-sign-out-confirm') })
+		);
+		await vi.waitFor(() =>
+			expect(callOf(fetchFn)[0]).toBe(`/api/v1/admin/users/${OTHER_ID}/sessions`)
+		);
+		expect(callOf(fetchFn)[1].method).toBe('DELETE');
+	});
+
+	it('lists the sessions of a user and signs one out', async () => {
+		const fetchFn = mockFetch(
+			reply(SessionListSchema, {
+				sessions: [
+					{
+						id: 's1',
+						userAgent: 'Mozilla/5.0 (Macintosh) Firefox/130.0',
+						lastSeenAt: ts('2026-01-01T00:00:00Z'),
+						createdAt: ts('2026-01-01T00:00:00Z')
+					}
+				]
+			}),
+			noContent()
+		);
+		vi.stubGlobal('fetch', fetchFn);
+		renderUsers();
+
+		await openMenu(t('admin-manage-label', { name: 'bob' }));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: t('admin-view-sessions') }));
+		const dialog = await screen.findByRole('dialog', {
+			name: t('admin-sessions-title', { name: 'bob' })
+		});
+		await fireEvent.click(await within(dialog).findByText(t('security-sessions-sign-out')));
+
+		await vi.waitFor(() =>
+			expect(callOf(fetchFn, 1)[0]).toBe(`/api/v1/admin/users/${OTHER_ID}/sessions/s1`)
+		);
+		expect(await within(dialog).findByText(t('admin-sessions-empty'))).toBeInTheDocument();
 	});
 
 	it('grants roles, searches and pages', async () => {

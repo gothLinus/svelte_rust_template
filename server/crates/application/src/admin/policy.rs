@@ -52,8 +52,13 @@ impl AdminPolicy {
         Ok(())
     }
 
-    /// Whether the actor may disable or re-enable an account holding `permissions`: only if they
-    /// hold all of them.
+    pub fn can_revoke_sessions(actor: &Actor) -> Result<(), AppError> {
+        actor.require(Permission::UsersManage)?;
+        actor.require_recent_authentication()
+    }
+
+    /// Whether the actor may disable or re-enable an account holding `permissions`, or sign it
+    /// out: only if they hold all of them.
     pub fn can_set_disabled_holder_of(
         actor: &Actor,
         permissions: PermissionSet,

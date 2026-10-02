@@ -368,6 +368,9 @@ describe('admin', () => {
 		await api.admin.revokeRole('u1', 'admin');
 		await api.admin.disable('u1');
 		await api.admin.enable('u1');
+		await api.admin.sessions('u1');
+		await api.admin.revokeSession('u1', 's1');
+		await api.admin.signOut('u1');
 		await api.admin.audit({ user: 'u1', limit: 5 });
 		await api.admin.audit();
 
@@ -384,6 +387,9 @@ describe('admin', () => {
 			'DELETE /admin/users/u1/roles/admin',
 			'POST /admin/users/u1/disable',
 			'POST /admin/users/u1/enable',
+			'GET /admin/users/u1/sessions',
+			'DELETE /admin/users/u1/sessions/s1',
+			'DELETE /admin/users/u1/sessions',
 			'GET /admin/audit?user=u1&limit=5',
 			'GET /admin/audit'
 		]);

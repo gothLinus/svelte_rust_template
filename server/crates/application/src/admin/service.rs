@@ -7,7 +7,7 @@ use domain::{
     error::StorageError,
     i18n::{Locale, Message},
     rbac::{Permission, RbacRepository, Role, RoleName},
-    session::SessionRepository,
+    session::{SessionId, SessionRepository},
     user::{User, UserId, UserRepository},
 };
 
@@ -16,7 +16,7 @@ use crate::{
     actor::Actor,
     admin::{AccountStatus, AdminPolicy, dto::ListUsersQuery, ensure_someone_manages_users},
     auth::access,
-    dto::{RoleDto, UserDto},
+    dto::{RoleDto, SessionDto, UserDto},
     error::AppError,
     pagination::PageDto,
 };
@@ -237,6 +237,82 @@ impl<A: Adapters> AdminService<A> {
 
         tracing::info!(actor = %actor.user_id, user_id = %id, ?status, "account status changed");
         Ok(dto)
+    }
+
+    /// The user's active sessions, most recently used first. `current` marks the actor's own.
+    ///
+    /// # Errors
+    ///
+    /// `Forbidden` without `users:read`; `NotFound` if there is no such user.
+    pub async fn user_sessions(
+        &self,
+        actor: &Actor,
+        id: UserId,
+    ) -> Result<Vec<SessionDto>, AppError> {
+        AdminPolicy::can_view_users(actor)?;
+        let now = self.ctx.clock.now();
+        let policy = &self.ctx.settings.sessions;
+
+        let mut conn = self.ctx.db.connection().await?;
+        conn.find_user(id).await?.ok_or(AppError::NotFound)?;
+        let sessions = conn.list_user_sessions(id).await?;
+        Ok(sessions
+            .iter()
+            .filter(|session| session.is_active(now, policy))
+            .map(|session| SessionDto::new(session, session.id() == actor.session_id, policy))
+            .collect())
+    }
+
+    /// Ends one of the user's sessions.
+    ///
+    /// # Errors
+    ///
+    /// `Forbidden` without `users:manage`, or if the account holds a permission the actor lacks;
+    /// `ReauthRequired` without a recent sign-in; `NotFound` if the user has no such session.
+    pub async fn revoke_user_session(
+        &self,
+        actor: &Actor,
+        id: UserId,
+        session: SessionId,
+    ) -> Result<(), AppError> {
+        AdminPolicy::can_revoke_sessions(actor)?;
+
+        let mut tx = self.ctx.db.transaction().await?;
+        let held = tx.permissions_of_user(id).await?;
+        AdminPolicy::can_set_disabled_holder_of(actor, held)?;
+        if !tx.delete_user_session(id, session).await? {
+            return Err(AppError::NotFound);
+        }
+        tx.record_audit_event(&self.admin_event(actor, id, AuditAction::SessionRevoked))
+            .await?;
+        tx.commit().await?;
+
+        tracing::info!(actor = %actor.user_id, user_id = %id, session_id = %session, "session revoked by admin");
+        Ok(())
+    }
+
+    /// Signs the user out everywhere without disabling the account: every session ends, and so do
+    /// pending links and codes, so a stolen session or link stops working at once.
+    ///
+    /// # Errors
+    ///
+    /// As [`AdminService::revoke_user_session`], with `NotFound` if there is no such user.
+    pub async fn sign_out_user(&self, actor: &Actor, id: UserId) -> Result<(), AppError> {
+        AdminPolicy::can_revoke_sessions(actor)?;
+
+        let mut tx = self.ctx.db.transaction().await?;
+        tx.find_user_for_update(id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        let held = tx.permissions_of_user(id).await?;
+        AdminPolicy::can_set_disabled_holder_of(actor, held)?;
+        let revoked = access::revoke_all(&mut tx, id, None).await?;
+        tx.record_audit_event(&self.admin_event(actor, id, AuditAction::SignedOutEverywhere))
+            .await?;
+        tx.commit().await?;
+
+        tracing::info!(actor = %actor.user_id, user_id = %id, revoked, "user signed out everywhere by admin");
+        Ok(())
     }
 
     /// An event about `user` caused by the administrator `actor`.
