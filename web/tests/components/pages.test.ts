@@ -106,7 +106,7 @@ describe('error pages', () => {
 });
 
 describe('app layout', () => {
-	it('has a skip link to the main landmark and a main navigation', async () => {
+	it('has a skip link past the header to the content, and a main navigation', async () => {
 		const user = userEvent.setup();
 		visit('/notes');
 		const unverified = me([Permission.NOTES_READ]);
@@ -115,7 +115,9 @@ describe('app layout', () => {
 
 		const skip = screen.getByRole('link', { name: t('app-skip-to-content') });
 		await user.click(skip);
-		expect(screen.getByRole('main')).toHaveFocus();
+		const main = screen.getByRole('main');
+		expect(main).toContainElement(document.activeElement as HTMLElement);
+		expect(document.activeElement).toHaveAttribute('id', 'content');
 		expect(screen.getAllByRole('navigation', { name: t('nav-main') }).length).toBeGreaterThan(0);
 		expect(screen.getByText(t('email-verification-title'))).toBeInTheDocument();
 	});

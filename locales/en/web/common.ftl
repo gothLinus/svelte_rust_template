@@ -11,3 +11,5 @@ common-email-placeholder = you@example.com
 
 # Screen-reader name of a spinner.
 common-loading = Loading
+# Screen reader name of the region where notifications pop up.
+common-notifications = Notifications

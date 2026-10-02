@@ -19,11 +19,12 @@
 
 	const active = $derived(activeItem(page.url.pathname));
 
-	let main = $state<HTMLElement | null>(null);
+	let content = $state<HTMLElement | null>(null);
 
+	// Past the header's controls, straight to the page's own content.
 	function skipToContent(event: MouseEvent) {
 		event.preventDefault();
-		main?.focus();
+		content?.focus();
 	}
 </script>
 
@@ -34,7 +35,7 @@
 </svelte:head>
 
 <a
-	href="#main"
+	href="#content"
 	onclick={skipToContent}
 	class="sr-only z-50 rounded-xl bg-background px-3 py-2 text-sm font-medium shadow-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
 >
@@ -43,7 +44,7 @@
 
 <Sidebar.Provider>
 	<AppSidebar me={data.me} />
-	<Sidebar.Inset id="main" tabindex={-1} bind:ref={main}>
+	<Sidebar.Inset>
 		<header
 			class="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur"
 		>
@@ -78,6 +79,9 @@
 		</header>
 		<!-- `Sidebar.Inset` is the page's <main>. The bottom padding clears the tab bar. -->
 		<div
+			id="content"
+			tabindex="-1"
+			bind:this={content}
 			class="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pt-4 pb-[calc(--spacing(20)+env(safe-area-inset-bottom))] md:p-8"
 		>
 			{#if !data.me.user.emailVerified}

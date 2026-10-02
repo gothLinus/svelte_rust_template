@@ -11,3 +11,4 @@ common-email-placeholder = name@beispiel.de
 
 # Screenreader-Name eines Ladeindikators.
 common-loading = Wird geladen
+common-notifications = Benachrichtigungen
