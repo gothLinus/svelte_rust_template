@@ -5,7 +5,7 @@ ARG RUST_VERSION=1.98.1
 
 # Base images are pinned by digest; bump RUST_VERSION and the cargo-chef digest together.
 
-FROM oven/bun:1@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS web
+FROM oven/bun:1@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS web
 WORKDIR /app/web
 COPY locales/ /app/locales/
 COPY web/package.json web/bun.lock ./
