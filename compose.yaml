@@ -25,7 +25,7 @@ services:
 
   # Catches outgoing mail; the inbox is at http://localhost:8025.
   mailpit:
-    image: axllent/mailpit:v1.31@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    image: axllent/mailpit:v1.32@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     profiles: [mail, prod]
     environment:
       # Reverse lookups of the gateway address stall every SMTP greeting.
